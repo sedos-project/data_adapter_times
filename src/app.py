@@ -1,4 +1,5 @@
 import pandas as pd
+import requests
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
@@ -49,7 +50,7 @@ def format_and_save_excel(processed_df, file_path):
     header_fill = PatternFill(
         start_color="FFFF00", end_color="FFFF00", fill_type="solid"
     )
-    header_font = Font(bold=True, color="FF0000")
+    header_font = Font(bold=True, color="000000")
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
@@ -102,6 +103,26 @@ def format_and_save_excel(processed_df, file_path):
     return file_path
 
 
+def fetch_data_as_dataframe(url):
+    """
+    Fetches data from the specified URL and returns it as a pandas DataFrame.
+
+    Parameters:
+    - url (str): The URL from which to fetch the data.
+
+    Returns:
+    - DataFrame: A pandas DataFrame containing the fetched data.
+    """
+    # Fetch the data
+    response = requests.get(url)
+    data = response.json()
+
+    # Convert the JSON data into a DataFrame
+    df = pd.DataFrame(data)
+
+    return df
+
+
 # Load the original DataFrame
 original_df = pd.read_excel("test_data.xlsx")
 
@@ -113,3 +134,7 @@ file_path = "test_output.xlsx"
 formatted_file_path = format_and_save_excel(processed_df, file_path)
 
 print(f"Excel file saved as: {formatted_file_path}")
+
+# url = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
+# df = fetch_data_as_dataframe(url)
+# print(df.head())
