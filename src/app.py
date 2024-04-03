@@ -87,22 +87,27 @@ def process_data(original_df):
 
 def format_and_save_excel(processed_df, file_path):
     """
-    The format_and_save_excel function takes a dataframe and saves it to an excel file.
-    The function also formats the excel file with headers, borders, and column widths.
+    The format_and_save_excel function takes a dataframe and saves it as an Excel file.
+    The function also formats the Excel file with headers, subheaders, column widths, etc.
 
 
-    :param processed_df: Pass the dataframe to be saved
-    :param file_path: Specify the path to save the file
+    :param processed_df: Pass the processed dataframe to the function
+    :param file_path: Specify the location where the excel file will be saved
     :return: The file_path
     :doc-author: Trelent
     """
     wb = Workbook()
     ws = wb.active
 
+    # Existing setup for fills, fonts, borders
     header_fill = PatternFill(
         start_color="FFFF00", end_color="FFFF00", fill_type="solid"
     )
-    header_font = Font(bold=True, color="000000")
+    subheader_fill = PatternFill(
+        start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+    )  # Assuming light green color for subheaders
+    header_font = Font(name="Arial", size=10, bold=True, color="000000")
+    sub_header_font = Font(name="Arial", size=10, bold=False, color="000000")
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
@@ -115,11 +120,14 @@ def format_and_save_excel(processed_df, file_path):
             cell.fill = fill
         if font:
             cell.font = font
+        else:
+            cell.font = sub_header_font
         if border:
             cell.border = border
         if alignment:
             cell.alignment = alignment
 
+    # Headers and subheaders for the Excel sheet
     headers = [
         "TechName",
         "*TechDesc",
@@ -140,6 +148,29 @@ def format_and_save_excel(processed_df, file_path):
         "2060",
         "2070",
     ]
+
+    subheaders = [
+        "*Technology Name",
+        "Technology Description",
+        "Attribute Declaration\nColumn",
+        "Input\nCommodity",
+        "Output\nCommodity",
+        "Commodity\nGroup",
+        "Time Slices\ndefinition",
+        "Bound\ndefinition",
+        "Base\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+    ]
+
+    # Write the headers with style
     for col, header_title in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=col, value=header_title)
         style_cell(
@@ -147,44 +178,49 @@ def format_and_save_excel(processed_df, file_path):
             fill=header_fill,
             font=header_font,
             border=thin_border,
-            alignment=Alignment(horizontal="center"),
+            alignment=Alignment(horizontal="center", wrap_text=True),
         )
 
-    column_widths = [
-        len(header) for header in headers
-    ]  # Initialize with header lengths
-    print(column_widths)
+    # Write the subheaders with style
+    for col, sub_header_title in enumerate(subheaders, start=1):
+        cell = ws.cell(row=2, column=col, value=sub_header_title)
+        style_cell(
+            cell,
+            fill=subheader_fill,
+            font=sub_header_font,
+            border=thin_border,
+            alignment=Alignment(horizontal="center", wrap_text=True),
+        )
 
-    for row_index, (idx, row) in enumerate(processed_df.iterrows(), start=2):
+    # Calculate column widths based on headers and subheaders
+    column_widths = [
+        max(len(header), max(len(part) for part in subheader.split("\n")))
+        for header, subheader in zip(headers, subheaders)
+    ]
+
+    # Write the data and format the cells
+    for row_index, (idx, row) in enumerate(
+        processed_df.iterrows(), start=3
+    ):  # Data starts from row 3
         for col_index, (col, value) in enumerate(row.items(), start=1):
             cell = ws.cell(row=row_index, column=col_index, value=value)
             style_cell(cell, border=thin_border)
-            if value:  # Update the max length if the current value is longer
-                column_widths[col_index - 1] = max(
-                    column_widths[col_index - 1], len(str(value))
-                )
+            # Update the max length if the current value is longer
+            column_widths[col_index - 1] = max(
+                column_widths[col_index - 1], len(str(value))
+            )
 
-    # Set column widths
+    # Set column widths with a little extra padding
     for i, width in enumerate(column_widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = (
-            width + 2
-        )  # +2 for a little extra padding
+        ws.column_dimensions[get_column_letter(i)].width = width + 1
 
+    # Save the workbook
     wb.save(file_path)
     return file_path
 
 
-def fetch_data_as_dataframe(url):
-    """
-    Fetches data from the specified URL and returns it as a pandas DataFrame.
+def fetch_data(url):
 
-    Parameters:
-    - url (str): The URL from which to fetch the data.
-
-    Returns:
-    - DataFrame: A pandas DataFrame containing the fetched data.
-    """
-    # Fetch the data
     response = requests.get(url)
     data = response.json()
 
@@ -207,6 +243,7 @@ formatted_file_path = format_and_save_excel(processed_df, file_path)
 
 print(f"Excel file saved as: {formatted_file_path}")
 
+# Fetch Data:
 # url = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
-# df = fetch_data_as_dataframe(url)
-# print(df.head())
+# fetched_data = fetch_data(url)
+# print(fetched_data)
