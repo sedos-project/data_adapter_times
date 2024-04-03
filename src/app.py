@@ -1,5 +1,6 @@
 import pandas as pd
 import requests
+import re
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
@@ -11,39 +12,90 @@ def process_data(original_df):
     comms_out = []
     attributes = []
 
+    # Regex pattern to detect elements within square brackets
+    bracket_pattern = re.compile(r"\[([^]]+)\]")
+
     for _, row in original_df.iterrows():
-        process = row["process"] if "process" in row else None
-        inputs = str(row["input"]).split(",") if "input" in row else []
-        outputs = str(row["output"]).split(",") if "output" in row else []
+        process = row.get("process", None)
+
+        # Check for NaN and convert to empty string if necessary
+        input_str = str(row.get("input", "")) if pd.notna(row.get("input")) else ""
+        output_str = str(row.get("output", "")) if pd.notna(row.get("output")) else ""
+
+        # Find all bracketed items and process them separately
+        bracketed_items = bracket_pattern.findall(input_str)
+        for bracketed_item in bracketed_items:
+            # Split each bracketed item by comma and strip whitespace
+            items = [item.strip() for item in bracketed_item.split(",")]
+            for item in items:
+                technology_names.append(process)
+                comms_in.append(item)
+                comms_out.append(None)
+                attributes.append("FLO_SHAR")
+
+        # Remove bracketed items from the input string before splitting
+        input_str = bracket_pattern.sub("", input_str)
+        inputs = [i.strip() for i in input_str.split(",") if i.strip()]
+
+        outputs = [o.strip() for o in output_str.split(",") if o.strip()]
 
         for inp in inputs:
             technology_names.append(process)
-            comms_in.append(inp.strip())
+            comms_in.append(inp)
             comms_out.append(None)
-            attributes.append("Input")
+            attributes.append("INPUT")
 
         for out in outputs:
             technology_names.append(process)
             comms_in.append(None)
-            comms_out.append(out.strip())
-            attributes.append("Output")
+            comms_out.append(out)
+            attributes.append("OUTPUT")
 
+    # Building the final DataFrame with specified columns
     data = {
-        "Technology Name": technology_names,
+        "TechName": technology_names,
         "TechDesc": ["" for _ in technology_names],
-        "Attribute": attributes,
-        "Comm-IN": [
-            inp if attr == "Input" else "" for inp, attr in zip(comms_in, attributes)
-        ],
-        "Comm-OUT": [
-            out if attr == "Output" else "" for out, attr in zip(comms_out, attributes)
-        ],
+        "Attribute": [attr.upper() for attr in attributes],
+        "Comm-IN": comms_in,
+        "Comm-OUT": comms_out,
+        "CommGrp": ["" for _ in technology_names],
+        "TimeSlice": ["" for _ in technology_names],
+        "LimType": ["" for _ in technology_names],
+        "2021": ["" for _ in technology_names],
+        "2024": ["" for _ in technology_names],
+        "2027": ["" for _ in technology_names],
+        "2030": ["" for _ in technology_names],
+        "2035": ["" for _ in technology_names],
+        "2040": ["" for _ in technology_names],
+        "2045": ["" for _ in technology_names],
+        "2050": ["" for _ in technology_names],
+        "2060": ["" for _ in technology_names],
+        "2070": ["" for _ in technology_names],
     }
 
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+
+    # Sort the DataFrame by "TechName" and "Attribute"
+    # Assigning a custom order for "Attribute"
+    attribute_order = {"INPUT": 1, "OUTPUT": 2, "FLO_SHAR": 3}
+    df["AttributeRank"] = df["Attribute"].map(attribute_order)
+    df.sort_values(by=["TechName", "AttributeRank"], inplace=True)
+    df.drop("AttributeRank", axis=1, inplace=True)
+
+    return df
 
 
 def format_and_save_excel(processed_df, file_path):
+    """
+    The format_and_save_excel function takes a dataframe and saves it to an excel file.
+    The function also formats the excel file with headers, borders, and column widths.
+
+
+    :param processed_df: Pass the dataframe to be saved
+    :param file_path: Specify the path to save the file
+    :return: The file_path
+    :doc-author: Trelent
+    """
     wb = Workbook()
     ws = wb.active
 
@@ -68,7 +120,26 @@ def format_and_save_excel(processed_df, file_path):
         if alignment:
             cell.alignment = alignment
 
-    headers = ["Technology Name", "*TechDesc", "Attribute", "Comm-IN", "Comm-OUT"]
+    headers = [
+        "TechName",
+        "*TechDesc",
+        "Attribute",
+        "Comm-IN",
+        "Comm-OUT",
+        "CommGrp",
+        "TimeSlice",
+        "LimType",
+        "2021",
+        "2024",
+        "2027",
+        "2030",
+        "2035",
+        "2040",
+        "2045",
+        "2050",
+        "2060",
+        "2070",
+    ]
     for col, header_title in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=col, value=header_title)
         style_cell(
@@ -128,6 +199,7 @@ original_df = pd.read_excel("test_data.xlsx")
 
 # Process the data
 processed_df = process_data(original_df)
+print(processed_df)
 
 # Format and save the Excel file
 file_path = "test_output.xlsx"
