@@ -161,17 +161,21 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Populate the CommName column with input and output commodities
-    all_commodities = (
-        processed_df["Comm-IN"].dropna().tolist()
-        + processed_df["Comm-OUT"].dropna().tolist()
+    # Combine input and output commodities, remove duplicates and drop null values
+    unique_commodities = (
+        pd.concat([processed_df["Comm-IN"], processed_df["Comm-OUT"]])
+        .dropna()
+        .drop_duplicates()
+        .tolist()
     )
 
+    # Populate the CommName column with unique commodities
     for row_idx, comm in enumerate(
-        all_commodities, start=4
+        unique_commodities, start=4
     ):  # Start from the fourth row
-
-        ws_comm.cell(row=row_idx, column=3, value=comm)  # Data in the third column
+        ws_comm.cell(
+            row=row_idx, column=3, value=comm
+        )  # CommName is in the third column
 
     # Adjust column widths
     for col in ws_comm.columns:
@@ -263,13 +267,14 @@ def add_process_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
+    # Get unique and non-null TechName values
+    unique_tech_names = processed_df["TechName"].dropna().drop_duplicates().tolist()
+
     # Populate the TechName column with data from processed_df
     for row_idx, tech_name in enumerate(
-        processed_df["TechName"], start=4
+        unique_tech_names, start=4
     ):  # Start from the fourth row
-        ws_process.cell(
-            row=row_idx, column=3, value=tech_name
-        )  # TechName is in the third column
+        ws_process.cell(row=row_idx, column=3, value=tech_name)
 
     # Adjust column widths
     for col in ws_process.columns:
