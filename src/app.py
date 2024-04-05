@@ -1,7 +1,7 @@
 import pandas as pd
 import requests
 import re
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
@@ -85,6 +85,209 @@ def process_data(original_df):
     return df
 
 
+def add_comm_sheet_to_workbook(file_path, processed_df):
+
+    # Load the existing workbook
+    wb = load_workbook(file_path)
+
+    # Create a new sheet
+    ws_comm = wb.create_sheet("Commodities")
+
+    # Define fills, fonts, borders, and alignment
+    header_fill = PatternFill(
+        start_color="FFFF00", end_color="FFFF00", fill_type="solid"
+    )
+    subheader_fill = PatternFill(
+        start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+    )
+
+    blue_font = Font(color="0000FF", size=11, bold=True)
+    header_font = Font(bold=True)
+    align_center = Alignment(horizontal="center", vertical="center")
+
+    # Set ~FI_Comm title
+    ws_comm["B1"] = "~FI_Comm"
+    ws_comm["B1"].font = blue_font
+    ws_comm["B1"].alignment = align_center
+
+    subheader_font = Font(color="000000")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+
+    # Define headers and subheaders
+    headers = [
+        "Csets",
+        "CommName",
+        "CommDesc",
+        "Unit",
+        "LimType",
+        "CTSLvl",
+        "PeakTS",
+        "Ctype",
+    ]
+
+    subheaders = [
+        "I: Commodity Set Membership",
+        "Commodity Name",
+        "Commodity Description",
+        "Unit",
+        "Balance Equ Type Override",
+        "Timeslice Tracking Level",
+        "Peak Monitoring",
+        "Electricity Indicator",
+    ]
+
+    # Write headers and subheaders
+    for col, header in enumerate(headers, start=2):  # Start from the second column
+        cell = ws_comm.cell(row=2, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = thin_border
+        cell.alignment = align_center
+
+    for col, subheader in enumerate(
+        subheaders, start=2
+    ):  # Start from the second column
+
+        cell = ws_comm.cell(row=3, column=col)
+        cell.value = subheader
+        cell.font = subheader_font
+        cell.fill = subheader_fill
+        cell.border = thin_border
+        cell.alignment = align_center
+
+    # Populate the CommName column with input and output commodities
+    all_commodities = (
+        processed_df["Comm-IN"].dropna().tolist()
+        + processed_df["Comm-OUT"].dropna().tolist()
+    )
+
+    for row_idx, comm in enumerate(
+        all_commodities, start=4
+    ):  # Start from the fourth row
+
+        ws_comm.cell(row=row_idx, column=3, value=comm)  # Data in the third column
+
+    # Adjust column widths
+    for col in ws_comm.columns:
+        max_length = 0
+        column = col[0].column_letter  # Get the column letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        adjusted_width = max_length + 1  # Add 1 padding and adjust for a better fit
+        ws_comm.column_dimensions[column].width = adjusted_width
+
+    # Save the workbook
+    wb.save(file_path)
+
+
+def add_process_sheet_to_workbook(file_path, processed_df):
+    # Load the existing workbook
+    wb = load_workbook(file_path)
+
+    # Create a new sheet
+    ws_process = wb.create_sheet("Processes")
+
+    # Define fills, fonts, borders, and alignment for the new headers and subheaders
+    header_fill = PatternFill(
+        start_color="FFFF00", end_color="FFFF00", fill_type="solid"
+    )
+    subheader_fill = PatternFill(
+        start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+    )
+    blue_font = Font(color="0000FF", size=11, bold=True)
+    header_font = Font(bold=True)
+    align_center = Alignment(horizontal="center", vertical="center")
+
+    # Set ~FI_Process title
+    ws_process["B1"] = "~FI_Process"
+    ws_process["B1"].font = blue_font
+    ws_process["B1"].alignment = align_center
+
+    subheader_font = Font(color="000000")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+
+    # Define headers and subheaders based on the provided image
+    headers = [
+        "Sets",
+        "TechName",
+        "TechDesc",
+        "Tact",
+        "Tcap",
+        "Tslvl",
+        "PrimaryCG",
+        "Vintage",
+    ]
+
+    subheaders = [
+        "I: Process Set Membership",
+        "Technology Name",
+        "Technology Description",
+        "Activity Unit",
+        "Capacity Unit",
+        "Timeslice Operational Level",
+        "Operational Commodity Group",
+        "Vintage Tracking",
+    ]
+
+    # Write headers and subheaders
+    for col, header in enumerate(headers, start=2):  # Start from the second column
+        cell = ws_process.cell(row=2, column=col)
+        cell.value = header
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = thin_border
+        cell.alignment = align_center
+
+    for col, subheader in enumerate(
+        subheaders, start=2
+    ):  # Start from the second column
+        cell = ws_process.cell(row=3, column=col)
+        cell.value = subheader
+        cell.font = subheader_font
+        cell.fill = subheader_fill
+        cell.border = thin_border
+        cell.alignment = align_center
+
+    # Populate the TechName column with data from processed_df
+    for row_idx, tech_name in enumerate(
+        processed_df["TechName"], start=4
+    ):  # Start from the fourth row
+        ws_process.cell(
+            row=row_idx, column=3, value=tech_name
+        )  # TechName is in the third column
+
+    # Adjust column widths
+    for col in ws_process.columns:
+        max_length = 0
+        column = col[0].column_letter  # Get the column letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(cell.value)
+            except:
+                pass
+        adjusted_width = max_length + 1  # Add padding and adjust for a better fit
+        ws_process.column_dimensions[column].width = adjusted_width
+
+    # Save the workbook
+    wb.save(file_path)
+
+
 def format_and_save_excel(processed_df, file_path):
     """
     The format_and_save_excel function takes a dataframe and saves it as an Excel file.
@@ -133,6 +336,7 @@ def format_and_save_excel(processed_df, file_path):
 
     # Headers and subheaders for the Excel sheet
     headers = [
+        "",
         "TechName",
         "*TechDesc",
         "Attribute",
@@ -154,6 +358,7 @@ def format_and_save_excel(processed_df, file_path):
     ]
 
     subheaders = [
+        "",
         "*Technology Name",
         "Technology Description",
         "Attribute Declaration\nColumn",
@@ -175,7 +380,7 @@ def format_and_save_excel(processed_df, file_path):
     ]
 
     # Write the table name with blue font
-    table_name_cell = ws.cell(row=1, column=1, value="~FI_T")
+    table_name_cell = ws.cell(row=1, column=2, value="~FI_T")
     style_cell(
         table_name_cell, font=table_name_font, alignment=Alignment(horizontal="center")
     )
@@ -213,15 +418,16 @@ def format_and_save_excel(processed_df, file_path):
     current_fill = fill1
 
     # Write the data and format the cells with alternating colors
-    for row_index, (idx, row) in enumerate(processed_df.iterrows(), start=4):
-        # Data starts from row 4
+    for row_index, (idx, row) in enumerate(
+        processed_df.iterrows(), start=4
+    ):  # Data starts from row 4
         process = row["TechName"]
         if process != current_process:
             # Switch the fill when the process changes
             current_fill = fill2 if current_fill == fill1 else fill1
             current_process = process
 
-        for col_index, (col, value) in enumerate(row.items(), start=1):
+        for col_index, (col, value) in enumerate(row.items(), start=2):
             cell = ws.cell(row=row_index, column=col_index, value=value)
             style_cell(cell, fill=current_fill, border=no_border)
             # Update the max length if the current value is longer
@@ -259,6 +465,9 @@ print(processed_df)
 # Format and save the Excel file
 file_path = "test_output.xlsx"
 formatted_file_path = format_and_save_excel(processed_df, file_path)
+
+add_comm_sheet_to_workbook("test_output.xlsx", processed_df)
+add_process_sheet_to_workbook("test_output.xlsx", processed_df)
 
 print(f"Excel file saved as: {formatted_file_path}")
 
