@@ -85,7 +85,6 @@ def process_data(original_df):
 
 
 def add_comm_sheet_to_workbook(file_path, processed_df):
-
     # Load the existing workbook
     wb = load_workbook(file_path)
 
@@ -99,7 +98,6 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
     subheader_fill = PatternFill(
         start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
     )
-
     blue_font = Font(color="0000FF", size=11, bold=True)
     header_font = Font(bold=True)
     align_center = Alignment(horizontal="center", vertical="center")
@@ -152,7 +150,6 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
     for col, subheader in enumerate(
         subheaders, start=2
     ):  # Start from the second column
-
         cell = ws_comm.cell(row=3, column=col)
         cell.value = subheader
         cell.font = subheader_font
@@ -160,21 +157,39 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Combine input and output commodities, remove duplicates and drop null values
-    unique_commodities = (
-        pd.concat([processed_df["Comm-IN"], processed_df["Comm-OUT"]])
-        .dropna()
-        .drop_duplicates()
-        .tolist()
+    # Load the commodity_set data from mapping.xlsx
+    wb_mapping = load_workbook("mapping.xlsx", data_only=True)
+    ws_mapping = wb_mapping["commodity_set"]
+
+    # Extract the commodities into a set for faster membership testing
+    mat_commodities = set(
+        row[0].lower().strip()
+        for row in ws_mapping.iter_rows(min_row=2, max_col=1, values_only=True)
+        if row[0]
     )
 
-    # Populate the CommName column with unique commodities
+    # Determine the commodity set membership
+    commodity_sets = {}
+    for commodity in set(
+        processed_df["Comm-IN"].dropna().unique().tolist()
+        + processed_df["Comm-OUT"].dropna().unique().tolist()
+    ):
+        commodity_lower = commodity.lower()
+        if "exo" in commodity_lower:
+            commodity_sets[commodity] = "DEM"
+        elif "emi" in commodity_lower:
+            commodity_sets[commodity] = "ENV"
+        elif commodity_lower in mat_commodities:
+            commodity_sets[commodity] = "MAT"
+        else:
+            commodity_sets[commodity] = "NRG"
+
+    # Populate the CommName column with unique commodities and set membership
     for row_idx, comm in enumerate(
-        unique_commodities, start=4
+        commodity_sets.keys(), start=4
     ):  # Start from the fourth row
-        ws_comm.cell(
-            row=row_idx, column=3, value=comm
-        )  # CommName is in the third column
+        ws_comm.cell(row=row_idx, column=2, value=commodity_sets[comm])  # Csets
+        ws_comm.cell(row=row_idx, column=3, value=comm)  # CommName
 
     # Adjust column widths
     for col in ws_comm.columns:
@@ -200,7 +215,7 @@ def add_process_sheet_to_workbook(file_path, processed_df):
     # Create a new sheet
     ws_process = wb.create_sheet("Processes")
 
-    # Define fills, fonts, borders, and alignment for the new headers and subheaders
+    # Define fills, fonts, borders, and alignment for headers and subheaders
     header_fill = PatternFill(
         start_color="FFFF00", end_color="FFFF00", fill_type="solid"
     )
@@ -224,7 +239,7 @@ def add_process_sheet_to_workbook(file_path, processed_df):
         bottom=Side(style="thin"),
     )
 
-    # Define headers and subheaders based on the provided image
+    # Define headers and subheaders
     headers = [
         "Sets",
         "TechName",
@@ -266,14 +281,22 @@ def add_process_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Get unique and non-null TechName values
-    unique_tech_names = processed_df["TechName"].dropna().drop_duplicates().tolist()
+    # Determine the process set membership
+    process_sets = {}
+    for _, row in processed_df.iterrows():
+        tech_name = row["TechName"]
+        output_commodities = row["Comm-OUT"]
+        if "chp" in tech_name.lower():
+            process_sets[tech_name] = "CHP"
+        elif pd.notna(output_commodities) and "exo" in output_commodities.lower():
+            process_sets[tech_name] = "DEM"
+        else:
+            process_sets.setdefault(tech_name, "PRE")
 
-    # Populate the TechName column with data from processed_df
-    for row_idx, tech_name in enumerate(
-        unique_tech_names, start=4
-    ):  # Start from the fourth row
-        ws_process.cell(row=row_idx, column=3, value=tech_name)
+    # Populate the process sheet
+    for row_idx, tech_name in enumerate(process_sets.keys(), start=4):
+        ws_process.cell(row=row_idx, column=2, value=process_sets[tech_name])  # Sets
+        ws_process.cell(row=row_idx, column=3, value=tech_name)  # TechName
 
     # Adjust column widths
     for col in ws_process.columns:
