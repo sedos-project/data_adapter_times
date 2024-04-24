@@ -10,6 +10,7 @@ def process_data(original_df):
     comms_in = []
     comms_out = []
     attributes = []
+    comm_grps = []
 
     # Regex pattern to detect elements within square brackets
     bracket_pattern = re.compile(r"\[([^]]+)\]")
@@ -27,15 +28,22 @@ def process_data(original_df):
             # Split each bracketed item by comma and strip whitespace
             items = [item.strip() for item in bracketed_item.split(",")]
             for item in items:
+                # Add ACT_EFF attribute just above FLO_SHAR
+                technology_names.append(process)
+                comms_in.append(None)
+                comms_out.append(None)
+                attributes.append("ACT_EFF")
+                comm_grps.append(f"cg_{process}")
+
                 technology_names.append(process)
                 comms_in.append(item)
                 comms_out.append(None)
                 attributes.append("FLO_SHAR")
+                comm_grps.append(f"cg_{process}")
 
         # Remove bracketed items from the input string before splitting
         input_str = bracket_pattern.sub("", input_str)
         inputs = [i.strip() for i in input_str.split(",") if i.strip()]
-
         outputs = [o.strip() for o in output_str.split(",") if o.strip()]
 
         for inp in inputs:
@@ -43,12 +51,14 @@ def process_data(original_df):
             comms_in.append(inp)
             comms_out.append(None)
             attributes.append("INPUT")
+            comm_grps.append("")
 
         for out in outputs:
             technology_names.append(process)
             comms_in.append(None)
             comms_out.append(out)
             attributes.append("OUTPUT")
+            comm_grps.append("")
 
     # Building the final DataFrame with specified columns
     data = {
@@ -57,7 +67,7 @@ def process_data(original_df):
         "Attribute": [attr.upper() for attr in attributes],
         "Comm-IN": comms_in,
         "Comm-OUT": comms_out,
-        "CommGrp": ["" for _ in technology_names],
+        "CommGrp": comm_grps,
         "TimeSlice": ["" for _ in technology_names],
         "LimType": ["" for _ in technology_names],
         "2021": ["" for _ in technology_names],
@@ -76,7 +86,7 @@ def process_data(original_df):
 
     # Sort the DataFrame by "TechName" and "Attribute"
     # Assigning a custom order for "Attribute"
-    attribute_order = {"INPUT": 1, "OUTPUT": 2, "FLO_SHAR": 3}
+    attribute_order = {"INPUT": 1, "OUTPUT": 2, "ACT_EFF": 3, "FLO_SHAR": 4}
     df["AttributeRank"] = df["Attribute"].map(attribute_order)
     df.sort_values(by=["TechName", "AttributeRank"], inplace=True)
     df.drop("AttributeRank", axis=1, inplace=True)
