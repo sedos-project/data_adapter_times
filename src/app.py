@@ -1,5 +1,4 @@
 import pandas as pd
-import requests
 import re
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
@@ -449,17 +448,6 @@ def format_and_save_excel(processed_df, file_path):
     return file_path
 
 
-def fetch_data(url):
-
-    response = requests.get(url)
-    data = response.json()
-
-    # Convert the JSON data into a DataFrame
-    df = pd.DataFrame(data)
-
-    return df
-
-
 # Load the original DataFrame
 original_df = pd.read_excel("test_data.xlsx")
 
@@ -475,8 +463,3 @@ add_comm_sheet_to_workbook("test_output.xlsx", processed_df)
 add_process_sheet_to_workbook("test_output.xlsx", processed_df)
 
 print(f"Excel file saved as: {formatted_file_path}")
-
-# Fetch Data:
-# url = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
-# fetched_data = fetch_data(url)
-# print(fetched_data)
