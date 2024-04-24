@@ -12,53 +12,71 @@ def process_data(original_df):
     attributes = []
     comm_grps = []
 
-    # Regex pattern to detect elements within square brackets
     bracket_pattern = re.compile(r"\[([^]]+)\]")
+    remove_pattern = re.compile(r"\b(pri_|sec_|iip_|exo_|emi_)")
 
     for _, row in original_df.iterrows():
         process = row.get("process", None)
-
-        # Check for NaN and convert to empty string if necessary
         input_str = str(row.get("input", "")) if pd.notna(row.get("input")) else ""
         output_str = str(row.get("output", "")) if pd.notna(row.get("output")) else ""
 
-        # Find all bracketed items and process them separately
+        # Find and clean the bracketed items for the CommGrp value
         bracketed_items = bracket_pattern.findall(input_str)
-        for bracketed_item in bracketed_items:
-            # Split each bracketed item by comma and strip whitespace
-            items = [item.strip() for item in bracketed_item.split(",")]
-            for item in items:
-                # Add ACT_EFF attribute just above FLO_SHAR
-                technology_names.append(process)
-                comms_in.append(None)
-                comms_out.append(None)
-                attributes.append("ACT_EFF")
-                comm_grps.append(f"cg_{process}")
+        cleaned_bracketed_items = [
+            remove_pattern.sub("", item)
+            for bracketed_item in bracketed_items
+            for item in bracketed_item.split(",")
+        ]
 
-                technology_names.append(process)
-                comms_in.append(item)
-                comms_out.append(None)
-                attributes.append("FLO_SHAR")
-                comm_grps.append(f"cg_{process}")
+        comm_grp_str = (
+            "cg_" + "_".join(cleaned_bracketed_items) if cleaned_bracketed_items else ""
+        )
 
-        # Remove bracketed items from the input string before splitting
-        input_str = bracket_pattern.sub("", input_str)
-        inputs = [i.strip() for i in input_str.split(",") if i.strip()]
-        outputs = [o.strip() for o in output_str.split(",") if o.strip()]
-
-        for inp in inputs:
-            technology_names.append(process)
-            comms_in.append(inp)
-            comms_out.append(None)
-            attributes.append("INPUT")
-            comm_grps.append("")
-
-        for out in outputs:
+        if bracketed_items:
+            # Append ACT_EFF attribute and its CommGrp
             technology_names.append(process)
             comms_in.append(None)
-            comms_out.append(out)
-            attributes.append("OUTPUT")
-            comm_grps.append("")
+            comms_out.append(None)
+            attributes.append("ACT_EFF")
+            comm_grps.append(comm_grp_str)
+
+            # Append FLO_SHAR attributes for each bracketed item
+            for original_item in bracketed_items:
+                for item in original_item.split(","):
+                    technology_names.append(process)
+                    comms_in.append(item.strip())
+                    comms_out.append(None)
+                    attributes.append("FLO_SHAR")
+                    comm_grps.append(comm_grp_str)
+
+        # Process the non-bracketed items normally
+        for inp in re.sub(bracket_pattern, "", input_str).split(","):
+            inp = inp.strip()
+            if inp:  # Check if the input item is not an empty string after stripping
+                technology_names.append(process)
+                comms_in.append(inp)
+                comms_out.append(None)
+                attributes.append("INPUT")
+                comm_grps.append("")
+
+        for out in output_str.split(","):
+            out = out.strip()
+            if out:  # Check if the output item is not an empty string after stripping
+                technology_names.append(process)
+                comms_in.append(None)
+                comms_out.append(out)
+                attributes.append("OUTPUT")
+                comm_grps.append("")
+
+    # Make sure all lists are of the same length before creating the DataFrame
+    if not (
+        len(technology_names)
+        == len(comms_in)
+        == len(comms_out)
+        == len(attributes)
+        == len(comm_grps)
+    ):
+        raise ValueError("Lists are not of the same length, cannot form a DataFrame.")
 
     # Building the final DataFrame with specified columns
     data = {
