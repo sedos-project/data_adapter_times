@@ -11,6 +11,7 @@ def process_data(original_df):
     comms_out = []
     attributes = []
     comm_grps = []
+    comm_grp_elements = {}  # Dictionary to store comm_grps with their elements
 
     bracket_pattern = re.compile(r"\[([^]]+)\]")
     remove_pattern = re.compile(r"\b(pri_|sec_|iip_|exo_|emi_)")
@@ -42,12 +43,18 @@ def process_data(original_df):
 
             # Append FLO_SHAR attributes for each bracketed item
             for original_item in bracketed_items:
-                for item in original_item.split(","):
+                elements = [item.strip() for item in original_item.split(",")]
+                for item in elements:
                     technology_names.append(process)
-                    comms_in.append(item.strip())
+                    comms_in.append(item)
                     comms_out.append(None)
                     attributes.append("FLO_SHAR")
                     comm_grps.append(comm_grp_str)
+                    # Collect elements for the comm_grp
+                    if comm_grp_str in comm_grp_elements:
+                        comm_grp_elements[comm_grp_str].add(item)
+                    else:
+                        comm_grp_elements[comm_grp_str] = set(elements)
 
         # Process the non-bracketed items normally
         for inp in re.sub(bracket_pattern, "", input_str).split(","):
@@ -109,7 +116,11 @@ def process_data(original_df):
     df.sort_values(by=["TechName", "AttributeRank"], inplace=True)
     df.drop("AttributeRank", axis=1, inplace=True)
 
-    return df
+    # Convert set of elements to list for easier handling later
+    for key in comm_grp_elements.keys():
+        comm_grp_elements[key] = list(comm_grp_elements[key])
+
+    return df, comm_grp_elements
 
 
 def add_comm_sheet_to_workbook(file_path, processed_df):
@@ -343,6 +354,76 @@ def add_process_sheet_to_workbook(file_path, processed_df):
     wb.save(file_path)
 
 
+def find_header_row(sheet, header_name):
+    """
+    Dynamically find the row that contains a specific header.
+
+    :param sheet: The worksheet to search
+    :param header_name: The name of the header to find
+    :return: The row number of the header
+    """
+    for row in range(1, 10):  # Assume headers are within the first 10 rows
+        for col in range(1, sheet.max_column + 1):
+            cell_value = str(sheet.cell(row=row, column=col).value)
+            if header_name.lower() in cell_value.lower():
+                return row
+    raise ValueError("Header row not found within the first 10 rows.")
+
+
+def update_commodity_groups(file_path, comm_grps):
+    """
+    Dynamically update the SysSettings.xlsx file with new commodity groups.
+
+    :param file_path: The path to the 'SysSettings.xlsx' file
+    :param comm_grps: Dictionary with commodity group names as keys and elements (list of strings) as values
+    """
+    # Load the workbook and select the 'commodity_group' sheet
+    wb = load_workbook(file_path)
+    ws = wb["commodity_group"]
+
+    # Dynamically find the header row by looking for a known header, e.g., "Name"
+    header_row = find_header_row(ws, "Name")
+    name_col = None
+    cset_cn_col = None
+
+    # Scan the found header row to locate the correct columns based on header names
+    for col in range(1, ws.max_column + 1):
+        header_value = str(ws.cell(row=header_row, column=col).value)
+        if header_value.strip().lower() == "name":
+            name_col = col
+        elif header_value.strip().lower() == "cset_cn":
+            cset_cn_col = col
+
+    # Validate that the necessary columns were found
+    if not name_col or not cset_cn_col:
+        raise ValueError("Required columns not found in the sheet")
+
+    # Create a set to track existing commodity names for quick lookup
+    existing_comms = set()
+    # Start reading from the row just after the header row
+    row_idx = header_row + 1
+    while ws.cell(row=row_idx, column=name_col).value:
+        existing_comms.add(ws.cell(row=row_idx, column=name_col).value.strip().lower())
+        row_idx += 1
+
+    # Reset row index to the next empty row
+    while ws.cell(row=row_idx, column=name_col).value:
+        row_idx += 1
+
+    # Add new commodity groups to the sheet, checking for duplicates
+    for comm_name, elements in comm_grps.items():
+        # Check if the commodity name is already present
+        if comm_name.strip().lower() not in existing_comms:
+            ws.cell(row=row_idx, column=name_col).value = comm_name  # Name
+            ws.cell(row=row_idx, column=cset_cn_col).value = ", ".join(
+                elements
+            )  # Cset_CN
+            row_idx += 1
+
+    # Save the workbook
+    wb.save(file_path)
+
+
 def format_and_save_excel(processed_df, file_path):
     """
     The format_and_save_excel function takes a dataframe and saves it as an Excel file.
@@ -503,8 +584,15 @@ def format_and_save_excel(processed_df, file_path):
 original_df = pd.read_excel("test_data.xlsx")
 
 # Process the data
-processed_df = process_data(original_df)
+processed_df, commodity_groups = process_data(original_df)
 print(processed_df)
+
+# Path to the SysSettings.xlsx
+sys_settings_path = "SysSettings.xlsx"
+
+# Update the commodity groups in the SysSettings file
+update_commodity_groups(sys_settings_path, commodity_groups)
+print(f"Updated Commodity Groups in: {sys_settings_path}")
 
 # Format and save the Excel file
 file_path = "test_output.xlsx"
