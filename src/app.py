@@ -5,7 +5,16 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
 
-def process_data(original_df):
+def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    This function takes in a pandas dataframe and processes the data to create a new dataframe with the specified columns.
+
+    Args:
+        original_df (pd.DataFrame): The original dataframe with the specified columns
+
+    Returns:
+        pd.DataFrame: The processed dataframe with the specified columns
+    """
     technology_names = []
     comms_in = []
     comms_out = []
@@ -124,6 +133,17 @@ def process_data(original_df):
 
 
 def add_comm_sheet_to_workbook(file_path, processed_df):
+    """
+    This function adds a new sheet named 'Commodities' to an existing Excel file.
+    It populates the sheet with commodity data and sets their membership in commodity sets.
+
+    Parameters:
+    file_path (str): The path to the existing Excel file.
+    processed_df (DataFrame): The DataFrame containing the processed data.
+
+    Returns:
+    None. The function modifies the existing Excel file in-place.
+    """
     # Load the existing workbook
     wb = load_workbook(file_path)
 
@@ -248,6 +268,17 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
 
 
 def add_process_sheet_to_workbook(file_path, processed_df):
+    """
+    This function adds a new sheet named 'Processes' to an existing Excel workbook.
+    The sheet is populated with process-related data based on the input DataFrame.
+
+    Parameters:
+    file_path (str): The path to the existing Excel workbook.
+    processed_df (DataFrame): A DataFrame containing processed data.
+
+    Returns:
+    None. The function modifies the existing workbook in-place.
+    """
     # Load the existing workbook
     wb = load_workbook(file_path)
 
@@ -356,13 +387,19 @@ def add_process_sheet_to_workbook(file_path, processed_df):
 
 def find_header_row(sheet, header_name):
     """
-    Dynamically find the row that contains a specific header.
+    This function finds the row number of the first occurrence of a specific header in a given sheet.
 
-    :param sheet: The worksheet to search
-    :param header_name: The name of the header to find
-    :return: The row number of the header
+    Parameters:
+    sheet (openpyxl.worksheet.worksheet.Worksheet): The worksheet where the header is to be found.
+    header_name (str): The name of the header to be found.
+
+    Returns:
+    int: The row number of the first occurrence of the header. If the header is not found, a ValueError is raised.
+
+    Raises:
+    ValueError: If the header is not found within the first 20 rows.
     """
-    for row in range(1, 10):  # Assume headers are within the first 10 rows
+    for row in range(1, 20):  # Assume headers are within the first 10 rows
         for col in range(1, sheet.max_column + 1):
             cell_value = str(sheet.cell(row=row, column=col).value)
             if header_name.lower() in cell_value.lower():
@@ -372,10 +409,14 @@ def find_header_row(sheet, header_name):
 
 def update_commodity_groups(file_path, comm_grps):
     """
-    Dynamically update the SysSettings.xlsx file with new commodity groups.
+    Updates the 'commodity_group' sheet in the Excel file located at 'file_path' with new commodity groups.
 
-    :param file_path: The path to the 'SysSettings.xlsx' file
-    :param comm_grps: Dictionary with commodity group names as keys and elements (list of strings) as values
+    Parameters:
+    file_path (str): The path to the Excel file.
+    comm_grps (dict): A dictionary where keys are commodity names and values are lists of elements associated with each commodity.
+
+    Returns:
+    None. The function modifies the existing workbook in-place.
     """
     # Load the workbook and select the 'commodity_group' sheet
     wb = load_workbook(file_path)
@@ -426,13 +467,14 @@ def update_commodity_groups(file_path, comm_grps):
 
 def format_and_save_excel(processed_df, file_path):
     """
-    The format_and_save_excel function takes a dataframe and saves it as an Excel file.
-    The function also formats the Excel file with headers, subheaders, column widths, etc.
+    Format and save the processed data into an Excel file.
 
-    :param processed_df: Pass the processed dataframe to the function
-    :param file_path: Specify the location where the excel file will be saved
-    :return: The file_path
-    :doc-author: Trelent
+    Parameters:
+    processed_df (pandas.DataFrame): The DataFrame containing the processed data.
+    file_path (str): The path where the Excel file will be saved.
+
+    Returns:
+    str: The path where the Excel file is saved.
     """
     wb = Workbook()
     ws = wb.active

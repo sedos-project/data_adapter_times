@@ -14,6 +14,6 @@ def fetch_data(url):
 
 
 # Fetch Data:
-# url = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
-# fetched_data = fetch_data(url)
-# print(fetched_data)
+url = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
+fetched_data = fetch_data(url)
+print(fetched_data)
