@@ -2,7 +2,6 @@ import pandas as pd
 import re
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
-from openpyxl.utils import get_column_letter
 
 
 def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
@@ -148,7 +147,7 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
     wb = load_workbook(file_path)
 
     # Create a new sheet
-    ws_comm = wb.create_sheet("Commodities")
+    ws_comm = wb.create_sheet("Commodity List")
 
     # Define fills, fonts, borders, and alignment
     header_fill = PatternFill(
@@ -283,7 +282,7 @@ def add_process_sheet_to_workbook(file_path, processed_df):
     wb = load_workbook(file_path)
 
     # Create a new sheet
-    ws_process = wb.create_sheet("Processes")
+    ws_process = wb.create_sheet("Process List")
 
     # Define fills, fonts, borders, and alignment for headers and subheaders
     header_fill = PatternFill(
@@ -465,161 +464,20 @@ def update_commodity_groups(file_path, comm_grps):
     wb.save(file_path)
 
 
-def format_and_save_excel(file_path, processed_df):
+def create_blank_excel(file_path):
     """
-    Format and save the processed data into an Excel file.
+    Creates a blank Excel file with the necessary structure for the subsequent operations.
 
     Parameters:
-    processed_df (pandas.DataFrame): The DataFrame containing the processed data.
-    file_path (str): The path where the Excel file will be saved.
+    file_path (str): The path where the blank Excel file will be created.
 
     Returns:
-    str: The path where the Excel file is saved.
+    None. The function creates an Excel file at the specified path.
     """
     wb = Workbook()
     ws = wb.active
-
-    # Existing setup for fills, fonts, borders
-    # Define two color fills for alternating rows
-    fill1 = PatternFill(start_color="DDD9C4", end_color="DDD9C4", fill_type="solid")
-    fill2 = PatternFill(start_color="C5d9F1", end_color="C5d9F1", fill_type="solid")
-    header_fill = PatternFill(
-        start_color="FFFF00", end_color="FFFF00", fill_type="solid"
-    )
-    subheader_fill = PatternFill(
-        start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
-    )  # Assuming light green color for subheaders
-    header_font = Font(name="Arial", size=10, bold=True, color="000000")
-    sub_header_font = Font(name="Arial", size=10, bold=False, color="000000")
-    table_name_font = Font(name="Arial", size=12, bold=True, color="0000FF")
-    thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
-    )
-    no_border = Border()
-
-    def style_cell(cell, fill=None, font=None, border=None, alignment=None):
-        if fill:
-            cell.fill = fill
-        if font:
-            cell.font = font
-        else:
-            cell.font = sub_header_font
-        if border is not None:  # Only apply the border if it is explicitly given
-            cell.border = border
-        if alignment:
-            cell.alignment = alignment
-
-    # Headers and subheaders for the Excel sheet
-    headers = [
-        "",
-        "TechName",
-        "*TechDesc",
-        "Attribute",
-        "Comm-IN",
-        "Comm-OUT",
-        "CommGrp",
-        "TimeSlice",
-        "LimType",
-        "2021",
-        "2024",
-        "2027",
-        "2030",
-        "2035",
-        "2040",
-        "2045",
-        "2050",
-        "2060",
-        "2070",
-    ]
-
-    subheaders = [
-        "",
-        "*Technology Name",
-        "Technology Description",
-        "Attribute Declaration\nColumn",
-        "Input\nCommodity",
-        "Output\nCommodity",
-        "Commodity\nGroup",
-        "Time Slices\ndefinition",
-        "Bound\ndefinition",
-        "Base\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-        "Data\nYear",
-    ]
-
-    # Write the table name with blue font
-    table_name_cell = ws.cell(row=1, column=2, value="~FI_T")
-    style_cell(
-        table_name_cell, font=table_name_font, alignment=Alignment(horizontal="center")
-    )
-
-    # Write the headers with style
-    for col, header_title in enumerate(headers, start=1):
-        cell = ws.cell(row=2, column=col, value=header_title)
-        style_cell(
-            cell,
-            fill=header_fill,
-            font=header_font,
-            border=thin_border,
-            alignment=Alignment(horizontal="center", wrap_text=True),
-        )
-
-    # Write the subheaders with style
-    for col, sub_header_title in enumerate(subheaders, start=1):
-        cell = ws.cell(row=3, column=col, value=sub_header_title)
-        style_cell(
-            cell,
-            fill=subheader_fill,
-            font=sub_header_font,
-            border=thin_border,
-            alignment=Alignment(horizontal="center", wrap_text=True),
-        )
-
-    # Calculate column widths based on headers and subheaders
-    column_widths = [
-        max(len(header), max(len(part) for part in subheader.split("\n")))
-        for header, subheader in zip(headers, subheaders)
-    ]
-
-    # Initialize the variable to keep track of the current process and the fill to apply
-    current_process = None
-    current_fill = fill1
-
-    # Write the data and format the cells with alternating colors
-    for row_index, (idx, row) in enumerate(
-        processed_df.iterrows(), start=4
-    ):  # Data starts from row 4
-        process = row["TechName"]
-        if process != current_process:
-            # Switch the fill when the process changes
-            current_fill = fill2 if current_fill == fill1 else fill1
-            current_process = process
-
-        for col_index, (col, value) in enumerate(row.items(), start=2):
-            cell = ws.cell(row=row_index, column=col_index, value=value)
-            style_cell(cell, fill=current_fill, border=no_border)
-            # Update the max length if the current value is longer
-            column_widths[col_index - 1] = max(
-                column_widths[col_index - 1], len(str(value))
-            )
-
-    # Set column widths with a little extra padding
-    for i, width in enumerate(column_widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = width + 1
-
-    # Save the workbook
+    ws.title = "Process Data"
     wb.save(file_path)
-    return file_path
 
 
 # Load the original DataFrame
@@ -629,18 +487,22 @@ SEDOS_FILE = pd.read_excel("test_data.xlsx")
 times_df, commodity_groups = process_data(SEDOS_FILE)
 print(times_df)
 
+# Define the path for the pickle file
+PICKLE_FILE_PATH = "times_df.pkl"
+# Save the times_df DataFrame as a pickle file
+times_df.to_pickle(PICKLE_FILE_PATH)
+print(f"times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
+
 # Path to the SysSettings.xlsx
 SYS_SETTINGS_PATH = "SysSettings.xlsx"
-
 # Update the commodity groups in the SysSettings file
 update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
 TIMES_FILE_PATH = "test_output.xlsx"
-FORMATTED_TIMES_FILE_PATH = format_and_save_excel(TIMES_FILE_PATH, times_df)
-
+create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 
-print(f"Excel file saved as: {FORMATTED_TIMES_FILE_PATH}")
+print(f"Excel file saved")

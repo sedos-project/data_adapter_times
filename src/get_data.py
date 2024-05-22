@@ -1,31 +1,171 @@
 import pandas as pd
 import requests
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
+from openpyxl.utils import get_column_letter
 
 
-def read_and_modify_excel(file_path, sheet_name="Sheet"):
-    # Load the Excel file and sheet
-    wb = load_workbook(file_path, data_only=True)
-    ws = wb[sheet_name]
+def format_and_save_excel(file_path, processed_df):
+    """
+    Format and save the processed data into an Excel file.
 
-    # Convert the sheet data to a DataFrame
-    data = [row for row in ws.iter_rows(values_only=True)]
-    df = pd.DataFrame(data)
+    Parameters:
+    processed_df (pandas.DataFrame): The DataFrame containing the processed data.
+    file_path (str): The path where the Excel file will be saved.
 
-    # Find the row containing '~FI_T' in the first 5 rows and modify the DataFrame
-    for idx, row in df.head(5).iterrows():
-        if "~FI_T" in row.values:
-            header_row_idx = idx + 1
-            df.columns = df.iloc[header_row_idx]
+    Returns:
+    str: The path where the Excel file is saved.
+    """
+    wb = load_workbook(file_path)
+    ws = wb.active
 
-            # Find the index of the "TechName" column
-            techname_col_idx = df.columns.get_loc("TechName")
+    # Existing setup for fills, fonts, borders
+    # Define two color fills for alternating rows
+    fill1 = PatternFill(start_color="DDD9C4", end_color="DDD9C4", fill_type="solid")
+    fill2 = PatternFill(start_color="C5d9F1", end_color="C5d9F1", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="FFFF00", end_color="FFFF00", fill_type="solid"
+    )
+    subheader_fill = PatternFill(
+        start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+    )  # Assuming light green color for subheaders
+    header_font = Font(name="Arial", size=10, bold=True, color="000000")
+    sub_header_font = Font(name="Arial", size=10, bold=False, color="000000")
+    table_name_font = Font(name="Arial", size=12, bold=True, color="0000FF")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+    no_border = Border()
 
-            # Select columns from "TechName" to the right
-            df = df.iloc[header_row_idx + 1 :, techname_col_idx:].reset_index(drop=True)
-            return df
+    def style_cell(cell, fill=None, font=None, border=None, alignment=None):
+        if fill:
+            cell.fill = fill
+        if font:
+            cell.font = font
+        else:
+            cell.font = sub_header_font
+        if border is not None:  # Only apply the border if it is explicitly given
+            cell.border = border
+        if alignment:
+            cell.alignment = alignment
 
-    raise ValueError("Row with '~FI_T' not found in the first 5 rows")
+    # Headers and subheaders for the Excel sheet
+    headers = [
+        "",
+        "TechName",
+        "*TechDesc",
+        "Attribute",
+        "Comm-IN",
+        "Comm-OUT",
+        "CommGrp",
+        "TimeSlice",
+        "LimType",
+        "2021",
+        "2024",
+        "2027",
+        "2030",
+        "2035",
+        "2040",
+        "2045",
+        "2050",
+        "2060",
+        "2070",
+    ]
+
+    subheaders = [
+        "",
+        "*Technology Name",
+        "Technology Description",
+        "Attribute Declaration\nColumn",
+        "Input\nCommodity",
+        "Output\nCommodity",
+        "Commodity\nGroup",
+        "Time Slices\ndefinition",
+        "Bound\ndefinition",
+        "Base\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+        "Data\nYear",
+    ]
+
+    # Write the table name with blue font
+    table_name_cell = ws.cell(row=1, column=2, value="~FI_T")
+    style_cell(
+        table_name_cell, font=table_name_font, alignment=Alignment(horizontal="center")
+    )
+
+    # Write the headers with style
+    for col, header_title in enumerate(headers, start=1):
+        cell = ws.cell(row=2, column=col, value=header_title)
+        style_cell(
+            cell,
+            fill=header_fill,
+            font=header_font,
+            border=thin_border,
+            alignment=Alignment(horizontal="center", wrap_text=True),
+        )
+
+    # Write the subheaders with style
+    for col, sub_header_title in enumerate(subheaders, start=1):
+        cell = ws.cell(row=3, column=col, value=sub_header_title)
+        style_cell(
+            cell,
+            fill=subheader_fill,
+            font=sub_header_font,
+            border=thin_border,
+            alignment=Alignment(horizontal="center", wrap_text=True),
+        )
+
+    # Calculate column widths based on headers and subheaders
+    column_widths = [
+        max(len(header), max(len(part) for part in subheader.split("\n")))
+        for header, subheader in zip(headers, subheaders)
+    ]
+
+    # Initialize the variable to keep track of the current process and the fill to apply
+    current_process = None
+    current_fill = fill1
+
+    # Write the data and format the cells with alternating colors
+    for row_index, (idx, row) in enumerate(
+        processed_df.iterrows(), start=4
+    ):  # Data starts from row 4
+        process = row["TechName"]
+        if process != current_process:
+            # Switch the fill when the process changes
+            current_fill = fill2 if current_fill == fill1 else fill1
+            current_process = process
+
+        for col_index, (col, value) in enumerate(row.items(), start=2):
+            cell = ws.cell(row=row_index, column=col_index, value=value)
+            style_cell(cell, fill=current_fill, border=no_border)
+            # Update the max length if the current value is longer
+            column_widths[col_index - 1] = max(
+                column_widths[col_index - 1], len(str(value))
+            )
+
+    # Set column widths with a little extra padding
+    for i, width in enumerate(column_widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width + 1
+
+    # Save the workbook
+    wb.save(file_path)
+    return file_path
+
+
+def read_pickle(file_path):
+    # Load the DataFrame from the pickle file
+    df = pd.read_pickle(file_path)
+    return df
 
 
 def fetch_data(url):
@@ -34,12 +174,16 @@ def fetch_data(url):
 
 
 # Paths and URLs
-EXCEL_FILE_PATH = "test_output.xlsx"
+TIMES_FILE_PATH = "test_output.xlsx"
 API_URL = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
 
-# Process the Excel file and print the modified DataFrame
-modified_times_df = read_and_modify_excel(EXCEL_FILE_PATH)
-print(modified_times_df)
+# Read the pickle file and print the DataFrame
+PICKLE_FILE_PATH = "times_df.pkl"
+times_df = read_pickle(PICKLE_FILE_PATH)
+print(times_df)
+
+format_and_save_excel(TIMES_FILE_PATH, times_df)
+print(f"Excel file saved")
 
 # Fetch and print data from the URL
 fetched_data = fetch_data(API_URL)
