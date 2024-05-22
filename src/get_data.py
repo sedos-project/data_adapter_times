@@ -162,29 +162,43 @@ def format_and_save_excel(file_path, processed_df):
     return file_path
 
 
-def read_pickle(file_path):
-    # Load the DataFrame from the pickle file
-    df = pd.read_pickle(file_path)
-    return df
-
-
 def fetch_data(url):
     response = requests.get(url)
     return pd.DataFrame(response.json())
 
 
+def data_mapping(df, process_name):
+    """
+    Fetches data from the API for a given process name and updates the times_df DataFrame.
+
+    Parameters:
+    times_df (pandas.DataFrame): The DataFrame containing the initial data.
+    process_name (str): The name of the process to fetch and process data for.
+
+    Returns:
+    pandas.DataFrame: The updated DataFrame with the new data merged.
+    """
+    # Filter for the specific process
+    times_df_filtered = df[times_df["TechName"] == process_name]
+
+    # Fetch data from the API for the specific process
+    API_URL = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows"
+    data = fetch_data(API_URL)
+
+    return times_df_filtered, data
+
+
 # Paths and URLs
 TIMES_FILE_PATH = "test_output.xlsx"
-API_URL = "https://openenergy-platform.org/api/v0/schema/model_draft/tables/ind_steel_blafu_0/rows"
 
 # Read the pickle file and print the DataFrame
 PICKLE_FILE_PATH = "times_df.pkl"
-times_df = read_pickle(PICKLE_FILE_PATH)
+times_df = pd.read_pickle(PICKLE_FILE_PATH)
 print(times_df)
 
-format_and_save_excel(TIMES_FILE_PATH, times_df)
-print(f"Excel file saved")
+# Fetch and process data for a specific process
+process = "ind_steel_blafu_0"
+updated_df, api_data = data_mapping(times_df, process)
 
-# Fetch and print data from the URL
-fetched_data = fetch_data(API_URL)
-print(fetched_data)
+# format_and_save_excel(TIMES_FILE_PATH, times_df)
+print(f"Excel file saved")
