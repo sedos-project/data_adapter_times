@@ -306,7 +306,6 @@ def data_mapping(times_df, process_name):
                                 comm_in_out_values = list(
                                     filter(pd.notna, comm_in_out_values)
                                 )
-                                # print(comm_in_out_values)
                                 # Parse the current api_col to get flow share commodity
                                 flow_share_commodity = api_col.replace(
                                     sedos_item, ""
@@ -361,10 +360,14 @@ def data_mapping(times_df, process_name):
 
     # Ensure the updated times_df_filtered has the same or larger index range
     if len(times_df_filtered) > (end_idx - start_idx + 1):
-        end_idx = start_idx + len(times_df_filtered) - 1
+        # Split the original times_df into three parts
+        before = times_df.iloc[:start_idx]
+        after = times_df.iloc[end_idx + 1 :]
 
-    # Update the original times_df with the updated times_df_filtered using iloc
-    times_df.iloc[start_idx : end_idx + 1] = times_df_filtered.values
+        # Concatenate the before part, updated times_df_filtered, and the after part
+        times_df = pd.concat([before, times_df_filtered, after], ignore_index=True)
+    else:
+        times_df.iloc[start_idx : end_idx + 1] = times_df_filtered.values
 
     return times_df
 
@@ -375,7 +378,7 @@ TIMES_FILE_PATH = "test_output.xlsx"
 # Read the pickle file and print the DataFrame
 PICKLE_FILE_PATH = "times_df.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
-# print(times_df)
+format_and_save_excel("test_output_cmp.xlsx", times_df)
 
 # Fetch and process data for a specific process
 process = "ind_steel_blafu_0"
