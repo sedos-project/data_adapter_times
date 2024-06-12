@@ -167,7 +167,29 @@ def fetch_data(url):
     return pd.DataFrame(response.json())
 
 
-def data_mapping(df, process_name):
+def find_header_row(sheet, header_name):
+    """
+    This function finds the row number of the first occurrence of a specific header in a given sheet.
+
+    Parameters:
+    sheet (openpyxl.worksheet.worksheet.Worksheet): The worksheet where the header is to be found.
+    header_name (str): The name of the header to be found.
+
+    Returns:
+    int: The row number of the first occurrence of the header. If the header is not found, a ValueError is raised.
+
+    Raises:
+    ValueError: If the header is not found within the first 20 rows.
+    """
+    for row in range(1, 20):  # Assume headers are within the first 10 rows
+        for col in range(1, sheet.max_column + 1):
+            cell_value = str(sheet.cell(row=row, column=col).value)
+            if header_name.lower() in cell_value.lower():
+                return row
+    raise ValueError("Header row not found within the first 10 rows.")
+
+
+def data_mapping(times_df, process_name):
     """
     Fetches data from the API for a given process name and updates the times_df DataFrame.
 
@@ -178,14 +200,173 @@ def data_mapping(df, process_name):
     Returns:
     pandas.DataFrame: The updated DataFrame with the new data merged.
     """
-    # Filter for the specific process
-    times_df_filtered = df[times_df["TechName"] == process_name]
+    # Filter for the specific process and keep track of the index range
+    times_df_filtered = times_df[times_df["TechName"] == process_name]
+    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
+    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
 
     # Fetch data from the API for the specific process
     API_URL = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows"
-    data = fetch_data(API_URL)
+    api_process_data = fetch_data(API_URL)
 
-    return times_df_filtered, data
+    # Load the mapping file
+    mapping_file_path = "mapping_v2.xlsx"
+    wb = load_workbook(mapping_file_path, data_only=True)
+    sheet = wb["SEDOS_parameters"]
+
+    # Find the header row for 'SEDOS'
+    header_row = find_header_row(sheet, "SEDOS")
+
+    # Extract the SEDOS and TIMES columns
+    sedos_list = []
+    times_list = []
+
+    for row in sheet.iter_rows(min_row=header_row + 1, max_row=sheet.max_row):
+        sedos_value = row[0].value  # Assuming SEDOS is in the first column
+        times_value = row[1].value  # Assuming TIMES is in the second column
+        if sedos_value and times_value:
+            sedos_list.append(sedos_value)
+            times_list.append(times_value)
+
+    # Modify the SEDOS list items
+    sedos_list = [item.split("<")[0].lower().strip() for item in sedos_list]
+
+    # Create a mapping dictionary
+    mapping_dict = dict(zip(sedos_list, times_list))
+
+    # Create a dictionary for matched SEDOS items and API column names
+    matched_columns = {}
+
+    for sedos_item in sedos_list:
+        for api_col in api_process_data.columns:
+            if sedos_item in api_col.lower():
+                if sedos_item not in matched_columns:
+                    matched_columns[sedos_item] = []
+                matched_columns[sedos_item].append(api_col)
+
+    # Add the TIMES list items corresponding to the matched SEDOS items
+    extended_matched_columns = {
+        sedos_item: (api_cols, mapping_dict[sedos_item])
+        for sedos_item, api_cols in matched_columns.items()
+    }
+
+    print("Extended Matched Columns:", extended_matched_columns)
+
+    # Update the times_df_filtered with the api_process_data based on the matched columns
+    for sedos_item, (api_cols, times_col) in extended_matched_columns.items():
+        for api_col in api_cols:
+            print(sedos_item, api_col, times_col)
+            if api_col in api_process_data.columns:
+                # Extract the values and year from the API data
+                api_values = api_process_data[api_col]
+                years = api_process_data["year"]
+                comm_col_value = api_col.replace("conversion_factor_", "")
+
+                for api_value, year in zip(api_values, years):
+                    # Find the column in times_df_filtered that matches the year
+                    if str(year) in times_df_filtered.columns:
+                        # Check if sedos_item contains 'conversion_factor_'
+                        if "conversion_factor_" in sedos_item:
+                            # Check if both the Attribute and Comm-IN/Comm-OUT match
+                            matching_row = times_df_filtered[
+                                (
+                                    (times_df_filtered["Attribute"] == times_col)
+                                    | (times_df_filtered["Attribute"] == "OUTPUT")
+                                    | (times_df_filtered["Attribute"] == "ACT_EFF")
+                                )
+                                & (
+                                    (times_df_filtered["Comm-IN"] == comm_col_value)
+                                    | (times_df_filtered["Comm-OUT"] == comm_col_value)
+                                )
+                            ]
+                            if not matching_row.empty:
+                                for idx in matching_row.index:
+                                    times_df_filtered.at[idx, str(year)] = api_value
+                            else:
+                                matching_row = times_df_filtered[
+                                    (times_df_filtered["Attribute"] == "ACT_EFF")
+                                ]
+                                if not matching_row.empty:
+                                    for idx in matching_row.index:
+                                        times_df_filtered.at[idx, str(year)] = api_value
+                        elif "flow_share" in sedos_item:
+                            # Add flow share values
+                            matching_row = times_df_filtered[
+                                times_df_filtered["Attribute"] == times_col
+                            ]
+                            if not matching_row.empty:
+                                comm_in_out_values = []
+                                for idx in matching_row.index:
+                                    comm_in_out_values.extend(
+                                        [
+                                            times_df_filtered.at[idx, "Comm-IN"],
+                                            times_df_filtered.at[idx, "Comm-OUT"],
+                                        ]
+                                    )
+                                comm_in_out_values = list(
+                                    filter(pd.notna, comm_in_out_values)
+                                )
+                                # print(comm_in_out_values)
+                                # Parse the current api_col to get flow share commodity
+                                flow_share_commodity = api_col.replace(
+                                    sedos_item, ""
+                                ).strip("_")
+
+                                # Add values to the matching rows
+                                sum_of_matched_values = 0
+                                for idx in matching_row.index:
+                                    comm_in = times_df_filtered.at[idx, "Comm-IN"]
+                                    comm_out = times_df_filtered.at[idx, "Comm-OUT"]
+                                    if flow_share_commodity in (comm_in, comm_out):
+                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        sum_of_matched_values += api_value
+
+                                # Handle the rows that do not match the flow share commodity
+                                for idx in matching_row.index:
+                                    if flow_share_commodity not in (
+                                        times_df_filtered.at[idx, "Comm-IN"],
+                                        times_df_filtered.at[idx, "Comm-OUT"],
+                                    ):
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            100 - sum_of_matched_values
+                                        )
+                        else:
+                            # Check if only the Attribute matches
+                            matching_row = times_df_filtered[
+                                times_df_filtered["Attribute"] == times_col
+                            ]
+                            if matching_row.empty:
+                                # Add a new row if the Attribute does not exist
+                                new_row = pd.Series(
+                                    {col: pd.NA for col in times_df_filtered.columns}
+                                )
+                                new_row["TechName"] = process_name
+                                new_row["Attribute"] = times_col
+                                times_df_filtered = pd.concat(
+                                    [times_df_filtered, new_row.to_frame().T],
+                                    ignore_index=True,
+                                )
+                                new_row_idx = times_df_filtered[
+                                    times_df_filtered["Attribute"] == times_col
+                                ].index[-1]
+                                times_df_filtered.at[new_row_idx, str(year)] = api_value
+                            else:
+                                for idx in matching_row.index:
+                                    times_df_filtered.at[idx, str(year)] = api_value
+
+    print(times_df_filtered)
+
+    # Replace <NA> with empty strings before updating the original times_df
+    times_df_filtered = times_df_filtered.fillna("")
+
+    # Ensure the updated times_df_filtered has the same or larger index range
+    if len(times_df_filtered) > (end_idx - start_idx + 1):
+        end_idx = start_idx + len(times_df_filtered) - 1
+
+    # Update the original times_df with the updated times_df_filtered using iloc
+    times_df.iloc[start_idx : end_idx + 1] = times_df_filtered.values
+
+    return times_df
 
 
 # Paths and URLs
@@ -194,11 +375,11 @@ TIMES_FILE_PATH = "test_output.xlsx"
 # Read the pickle file and print the DataFrame
 PICKLE_FILE_PATH = "times_df.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
-print(times_df)
+# print(times_df)
 
 # Fetch and process data for a specific process
 process = "ind_steel_blafu_0"
-updated_df, api_data = data_mapping(times_df, process)
+updated_df = data_mapping(times_df, process)
 
-# format_and_save_excel(TIMES_FILE_PATH, times_df)
+format_and_save_excel(TIMES_FILE_PATH, updated_df)
 print(f"Excel file saved")
