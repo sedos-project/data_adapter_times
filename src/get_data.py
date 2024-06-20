@@ -162,9 +162,20 @@ def format_and_save_excel(file_path, processed_df):
     return file_path
 
 
-def fetch_data(url):
-    response = requests.get(url)
-    return pd.DataFrame(response.json())
+def fetch_data(url, process_name):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            print(f"Data fetched successfully for process: {process_name}")
+            return pd.DataFrame(response.json())
+        else:
+            print(
+                f"Failed to fetch data for process: {process_name}, status code: {response.status_code}"
+            )
+            return pd.DataFrame()  # Return an empty DataFrame if status code is not 200
+    except requests.RequestException as e:
+        print(f"No data found for process: {process_name}, error: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame in case of error
 
 
 def find_header_row(sheet, header_name):
@@ -207,7 +218,10 @@ def data_mapping(times_df, process_name):
 
     # Fetch data from the API for the specific process
     API_URL = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows"
-    api_process_data = fetch_data(API_URL)
+    api_process_data = fetch_data(API_URL, process_name)
+
+    if api_process_data.empty:
+        return times_df  # Return the original DataFrame if no data is fetched
 
     # Load the mapping file
     mapping_file_path = "mapping_v2.xlsx"
@@ -250,12 +264,12 @@ def data_mapping(times_df, process_name):
         for sedos_item, api_cols in matched_columns.items()
     }
 
-    print("Extended Matched Columns:", extended_matched_columns)
+    # print("Extended Matched Columns:", extended_matched_columns)
 
     # Update the times_df_filtered with the api_process_data based on the matched columns
     for sedos_item, (api_cols, times_col) in extended_matched_columns.items():
         for api_col in api_cols:
-            print(sedos_item, api_col, times_col)
+            # print(sedos_item, api_col, times_col)
             if api_col in api_process_data.columns:
                 # Extract the values and year from the API data
                 api_values = api_process_data[api_col]
@@ -380,9 +394,17 @@ PICKLE_FILE_PATH = "times_df.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
 format_and_save_excel("test_output_cmp.xlsx", times_df)
 
-# Fetch and process data for a specific process
-process = "ind_steel_blafu_0"
-updated_df = data_mapping(times_df, process)
+# Create a copy of times_df to work with
+updated_df = times_df.copy()
+
+# Fetch and process data for each unique process in the TechName column that starts with 'ind'
+unique_processes = times_df["TechName"].unique()
+ind_processes = [process for process in unique_processes if process.startswith("ind")]
+
+for process in ind_processes:
+    updated_df = data_mapping(
+        updated_df, process
+    )  # Perform data mapping and update updated_df
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 print(f"Excel file saved")
