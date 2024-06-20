@@ -215,16 +215,21 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Load the commodity_set data from mapping.xlsx
-    wb_mapping = load_workbook("mapping.xlsx", data_only=True)
+    # Load the commodity_set data from mapping_v2.xlsx
+    wb_mapping = load_workbook("mapping_v2.xlsx", data_only=True)
     ws_mapping = wb_mapping["commodity_set"]
 
-    # Extract the commodities into a set for faster membership testing
-    mat_commodities = set(
-        row[0].lower().strip()
-        for row in ws_mapping.iter_rows(min_row=2, max_col=1, values_only=True)
-        if row[0]
-    )
+    # Find the header row dynamically
+    header_row = find_header_row(ws_mapping, "CommName")
+
+    # Create a dictionary to store commodity set memberships
+    commodity_set_dict = {}
+    for row in ws_mapping.iter_rows(min_row=header_row + 1, values_only=True):
+        comm_name = str(row[0]).lower().strip() if row[0] else ""
+        cset = (
+            str(row[3]).strip() if row[3] else ""
+        )  # Adjust the index based on the actual column for Csets
+        commodity_set_dict[comm_name] = cset
 
     # Determine the commodity set membership
     commodity_sets = {}
@@ -237,7 +242,10 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
             commodity_sets[commodity] = "DEM"
         elif "emi" in commodity_lower:
             commodity_sets[commodity] = "ENV"
-        elif commodity_lower in mat_commodities:
+        elif (
+            commodity_lower in commodity_set_dict
+            and commodity_set_dict[commodity_lower] == "MAT"
+        ):
             commodity_sets[commodity] = "MAT"
         else:
             commodity_sets[commodity] = "NRG"
@@ -481,7 +489,7 @@ def create_blank_excel(file_path):
 
 
 # Load the original DataFrame
-SEDOS_FILE = pd.read_excel("test_data.xlsx")
+SEDOS_FILE = pd.read_excel("test_data.xlsx", sheet_name="Processes_O1")
 
 # Process the data
 times_df, commodity_groups = process_data(SEDOS_FILE)
