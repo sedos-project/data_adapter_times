@@ -231,22 +231,28 @@ def data_mapping(times_df, process_name):
     # Find the header row for 'SEDOS'
     header_row = find_header_row(sheet, "SEDOS")
 
-    # Extract the SEDOS and TIMES columns
+    # Extract the SEDOS, TIMES, and Constraints columns
     sedos_list = []
     times_list = []
+    constraints_list = []
 
     for row in sheet.iter_rows(min_row=header_row + 1, max_row=sheet.max_row):
         sedos_value = row[0].value  # Assuming SEDOS is in the first column
         times_value = row[1].value  # Assuming TIMES is in the second column
+        constraints_value = row[8].value  # Assuming Constraints is in the ninth column
         if sedos_value and times_value:
             sedos_list.append(sedos_value)
             times_list.append(times_value)
+            constraints_list.append(
+                constraints_value if constraints_value is not None else ""
+            )
 
     # Modify the SEDOS list items
     sedos_list = [item.split("<")[0].lower().strip() for item in sedos_list]
 
     # Create a mapping dictionary
     mapping_dict = dict(zip(sedos_list, times_list))
+    constraints_dict = dict(zip(sedos_list, constraints_list))
 
     # Create a dictionary for matched SEDOS items and API column names
     matched_columns = {}
@@ -258,16 +264,20 @@ def data_mapping(times_df, process_name):
                     matched_columns[sedos_item] = []
                 matched_columns[sedos_item].append(api_col)
 
-    # Add the TIMES list items corresponding to the matched SEDOS items
+    # Add the TIMES list items and constraints corresponding to the matched SEDOS items
     extended_matched_columns = {
-        sedos_item: (api_cols, mapping_dict[sedos_item])
+        sedos_item: (api_cols, mapping_dict[sedos_item], constraints_dict[sedos_item])
         for sedos_item, api_cols in matched_columns.items()
     }
 
     # print("Extended Matched Columns:", extended_matched_columns)
 
     # Update the times_df_filtered with the api_process_data based on the matched columns
-    for sedos_item, (api_cols, times_col) in extended_matched_columns.items():
+    for sedos_item, (
+        api_cols,
+        times_col,
+        constraint,
+    ) in extended_matched_columns.items():
         for api_col in api_cols:
             # print(sedos_item, api_col, times_col)
             if api_col in api_process_data.columns:
@@ -302,7 +312,9 @@ def data_mapping(times_df, process_name):
                                 ]
                                 if not matching_row.empty:
                                     for idx in matching_row.index:
-                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            1 / api_value
+                                        )
                         elif "flow_share" in sedos_item:
                             # Add flow share values
                             matching_row = times_df_filtered[
@@ -332,6 +344,9 @@ def data_mapping(times_df, process_name):
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
                                     if flow_share_commodity in (comm_in, comm_out):
                                         times_df_filtered.at[idx, str(year)] = api_value
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
                                         sum_of_matched_values += api_value
 
                                 # Handle the rows that do not match the flow share commodity
@@ -342,6 +357,9 @@ def data_mapping(times_df, process_name):
                                     ):
                                         times_df_filtered.at[idx, str(year)] = (
                                             100 - sum_of_matched_values
+                                        )
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
                                         )
                         else:
                             # Check if only the Attribute matches
@@ -355,6 +373,7 @@ def data_mapping(times_df, process_name):
                                 )
                                 new_row["TechName"] = process_name
                                 new_row["Attribute"] = times_col
+                                new_row["LimType"] = constraint
                                 times_df_filtered = pd.concat(
                                     [times_df_filtered, new_row.to_frame().T],
                                     ignore_index=True,
@@ -366,11 +385,12 @@ def data_mapping(times_df, process_name):
                             else:
                                 for idx in matching_row.index:
                                     times_df_filtered.at[idx, str(year)] = api_value
+                                    times_df_filtered.at[idx, "LimType"] = constraint
 
-    print(times_df_filtered)
+    # print(times_df_filtered)
 
     # Replace <NA> with empty strings before updating the original times_df
-    times_df_filtered = times_df_filtered.fillna("")
+    times_df_filtered = times_df_filtered.fillna("").infer_objects()
 
     # Ensure the updated times_df_filtered has the same or larger index range
     if len(times_df_filtered) > (end_idx - start_idx + 1):
