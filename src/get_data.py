@@ -413,12 +413,12 @@ def data_mapping(times_df, process_name):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "test_output.xlsx"
+TIMES_FILE_PATH = "test_output_ind.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "times_df.pkl"
+PICKLE_FILE_PATH = "times_df_ind.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
-format_and_save_excel("test_output_cmp.xlsx", times_df)
+# format_and_save_excel("test_output_cmp.xlsx", times_df)
 
 # Create a copy of times_df to work with
 updated_df = times_df.copy()
