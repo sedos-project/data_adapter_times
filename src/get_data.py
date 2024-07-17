@@ -146,6 +146,11 @@ def format_and_save_excel(file_path, processed_df):
             current_process = process
 
         for col_index, (col, value) in enumerate(row.items(), start=2):
+            # Convert empty lists to empty strings
+            if isinstance(value, list) and not value:
+                value = ""
+            elif isinstance(value, list):
+                value = ", ".join(map(str, value))
             cell = ws.cell(row=row_index, column=col_index, value=value)
             style_cell(cell, fill=current_fill, border=no_border)
             # Update the max length if the current value is longer
@@ -390,7 +395,8 @@ def data_mapping(times_df, process_name):
     # print(times_df_filtered)
 
     # Replace <NA> with empty strings before updating the original times_df
-    times_df_filtered = times_df_filtered.fillna("").infer_objects()
+    with pd.option_context("future.no_silent_downcasting", True):
+        times_df_filtered = times_df_filtered.fillna("")
 
     # Ensure the updated times_df_filtered has the same or larger index range
     if len(times_df_filtered) > (end_idx - start_idx + 1):
@@ -427,4 +433,4 @@ for process in ind_processes:
     )  # Perform data mapping and update updated_df
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
-print(f"Excel file saved")
+print("Excel file saved")
