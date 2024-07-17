@@ -413,10 +413,10 @@ def data_mapping(times_df, process_name):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "test_output_ind.xlsx"
+TIMES_FILE_PATH = "test_output_x2x.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "times_df_ind.pkl"
+PICKLE_FILE_PATH = "times_df_x2x.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
 # format_and_save_excel("test_output_cmp.xlsx", times_df)
 
@@ -425,9 +425,9 @@ updated_df = times_df.copy()
 
 # Fetch and process data for each unique process in the TechName column that starts with 'ind'
 unique_processes = times_df["TechName"].unique()
-ind_processes = [process for process in unique_processes if process.startswith("ind")]
+x2x_processes = [process for process in unique_processes if process.startswith("x2x")]
 
-for process in ind_processes:
+for process in x2x_processes:
     updated_df = data_mapping(
         updated_df, process
     )  # Perform data mapping and update updated_df
