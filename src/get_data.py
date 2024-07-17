@@ -172,7 +172,10 @@ def fetch_data(url, process_name):
         response = requests.get(url)
         if response.status_code == 200:
             print(f"Data fetched successfully for process: {process_name}")
-            return pd.DataFrame(response.json())
+            data = pd.DataFrame(response.json())
+            return (
+                data if not data.empty else pd.DataFrame()
+            )  # Return data or an empty DataFrame if no data is fetched
         else:
             print(
                 f"Failed to fetch data for process: {process_name}, status code: {response.status_code}"
@@ -205,28 +208,37 @@ def find_header_row(sheet, header_name):
     raise ValueError("Header row not found within the first 10 rows.")
 
 
-def data_mapping(times_df, process_name):
-    """
-    Fetches data from the API for a given process name and updates the times_df DataFrame.
-
-    Parameters:
-    times_df (pandas.DataFrame): The DataFrame containing the initial data.
-    process_name (str): The name of the process to fetch and process data for.
-
-    Returns:
-    pandas.DataFrame: The updated DataFrame with the new data merged.
-    """
-    # Filter for the specific process and keep track of the index range
-    times_df_filtered = times_df[times_df["TechName"] == process_name]
-    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
-    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
-
-    # Fetch data from the API for the specific process
+def data_mapping(times_df, process_name, is_group=False):
+    # API URL for fetching data
     API_URL = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows"
+
     api_process_data = fetch_data(API_URL, process_name)
 
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
+
+    if is_group:
+        # Divide the data based on the 'type' column
+        process_groups = api_process_data.groupby("type")
+        for process, group_data in process_groups:
+            handled_processes.append(process)
+            times_df = data_mapping_internal(
+                times_df, process, group_data
+            )  # Call internal function for each process
+        return times_df
+    else:
+        return data_mapping_internal(times_df, process_name, api_process_data)
+
+
+def data_mapping_internal(times_df, process_name, api_process_data):
+    # Filter for the specific process and keep track of the index range
+    times_df_filtered = times_df[times_df["TechName"] == process_name]
+    if times_df_filtered.empty:
+        print(f"{process_name} was not found in the SEDOS input and hence was skipped")
+        return times_df  # Skip if there is no matching process
+
+    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
+    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
 
     # Load the mapping file
     mapping_file_path = "mapping_v2.xlsx"
@@ -275,8 +287,6 @@ def data_mapping(times_df, process_name):
         for sedos_item, api_cols in matched_columns.items()
     }
 
-    # print("Extended Matched Columns:", extended_matched_columns)
-
     # Update the times_df_filtered with the api_process_data based on the matched columns
     for sedos_item, (
         api_cols,
@@ -284,7 +294,6 @@ def data_mapping(times_df, process_name):
         constraint,
     ) in extended_matched_columns.items():
         for api_col in api_cols:
-            # print(sedos_item, api_col, times_col)
             if api_col in api_process_data.columns:
                 # Extract the values and year from the API data
                 api_values = api_process_data[api_col]
@@ -392,8 +401,6 @@ def data_mapping(times_df, process_name):
                                     times_df_filtered.at[idx, str(year)] = api_value
                                     times_df_filtered.at[idx, "LimType"] = constraint
 
-    # print(times_df_filtered)
-
     # Replace <NA> with empty strings before updating the original times_df
     with pd.option_context("future.no_silent_downcasting", True):
         times_df_filtered = times_df_filtered.fillna("")
@@ -413,24 +420,44 @@ def data_mapping(times_df, process_name):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "test_output.xlsx"
+TIMES_FILE_PATH = "test_output_tra.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "times_df.pkl"
+PICKLE_FILE_PATH = "times_df_tra.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
-format_and_save_excel("test_output_cmp.xlsx", times_df)
+# format_and_save_excel("test_output_cmp.xlsx", times_df)
 
 # Create a copy of times_df to work with
 updated_df = times_df.copy()
 
-# Fetch and process data for each unique process in the TechName column that starts with 'ind'
-unique_processes = times_df["TechName"].unique()
-ind_processes = [process for process in unique_processes if process.startswith("ind")]
+# Pre-defined process groups to handle
+process_groups = [
+    "tra_air_pass_0",
+    "tra_air_pass_1",
+    "tra_rail_pass_0",
+    "tra_water_frei_0",
+    "tra_water_frei_1",
+]
 
-for process in ind_processes:
-    updated_df = data_mapping(
-        updated_df, process
-    )  # Perform data mapping and update updated_df
+# Define a global list to keep track of processes that have been handled
+handled_processes = []
+
+# Handle pre-defined process groups first
+for process_group in process_groups:
+    updated_df = data_mapping(updated_df, process_group, is_group=True)
+
+print(handled_processes)
+print(len(handled_processes))
+
+# Fetch and process data for each unique process in the TechName column that starts with 'tra'
+unique_processes = times_df["TechName"].unique()
+tra_processes = [process for process in unique_processes if process.startswith("tra")]
+
+for process in tra_processes:
+    if process not in handled_processes:
+        updated_df = data_mapping(
+            updated_df, process
+        )  # Perform data mapping and update updated_df
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 print("Excel file saved")

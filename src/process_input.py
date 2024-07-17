@@ -489,14 +489,14 @@ def create_blank_excel(file_path):
 
 
 # Load the original DataFrame
-SEDOS_FILE = pd.read_excel("test_data.xlsx", sheet_name="Processes_O1")
+SEDOS_FILE = pd.read_excel("test_data_tra.xlsx", sheet_name="Processes_O1")
 
 # Process the data
 times_df, commodity_groups = process_data(SEDOS_FILE)
 print(times_df)
 
 # Define the path for the pickle file
-PICKLE_FILE_PATH = "times_df.pkl"
+PICKLE_FILE_PATH = "times_df_tra.pkl"
 # Save the times_df DataFrame as a pickle file
 times_df.to_pickle(PICKLE_FILE_PATH)
 print(f"times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
@@ -508,9 +508,9 @@ update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
-TIMES_FILE_PATH = "test_output.xlsx"
+TIMES_FILE_PATH = "test_output_tra.xlsx"
 create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 
-print(f"Excel file saved")
+print("Excel file saved")
