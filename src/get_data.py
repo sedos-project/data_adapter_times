@@ -310,16 +310,22 @@ def data_mapping(times_df, process_name):
                             ]
                             if not matching_row.empty:
                                 for idx in matching_row.index:
-                                    times_df_filtered.at[idx, str(year)] = api_value
+                                    if (
+                                        api_value is not None
+                                    ):  # Check if api_value is not None
+                                        times_df_filtered.at[idx, str(year)] = api_value
                             else:
                                 matching_row = times_df_filtered[
                                     (times_df_filtered["Attribute"] == "ACT_EFF")
                                 ]
                                 if not matching_row.empty:
                                     for idx in matching_row.index:
-                                        times_df_filtered.at[idx, str(year)] = (
-                                            1 / api_value
-                                        )
+                                        if (
+                                            api_value is not None
+                                        ):  # Check if api_value is not None
+                                            times_df_filtered.at[idx, str(year)] = (
+                                                1 / api_value
+                                            )
                         elif "flow_share" in sedos_item:
                             # Add flow share values
                             matching_row = times_df_filtered[
@@ -348,11 +354,16 @@ def data_mapping(times_df, process_name):
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
                                     if flow_share_commodity in (comm_in, comm_out):
-                                        times_df_filtered.at[idx, str(year)] = api_value
-                                        times_df_filtered.at[idx, "LimType"] = (
-                                            constraint
-                                        )
-                                        sum_of_matched_values += api_value
+                                        if (
+                                            api_value is not None
+                                        ):  # Check if api_value is not None
+                                            times_df_filtered.at[idx, str(year)] = (
+                                                api_value
+                                            )
+                                            times_df_filtered.at[idx, "LimType"] = (
+                                                constraint
+                                            )
+                                            sum_of_matched_values += api_value
 
                                 # Handle the rows that do not match the flow share commodity
                                 for idx in matching_row.index:
@@ -386,11 +397,21 @@ def data_mapping(times_df, process_name):
                                 new_row_idx = times_df_filtered[
                                     times_df_filtered["Attribute"] == times_col
                                 ].index[-1]
-                                times_df_filtered.at[new_row_idx, str(year)] = api_value
+                                if (
+                                    api_value is not None
+                                ):  # Check if api_value is not None
+                                    times_df_filtered.at[new_row_idx, str(year)] = (
+                                        api_value
+                                    )
                             else:
                                 for idx in matching_row.index:
-                                    times_df_filtered.at[idx, str(year)] = api_value
-                                    times_df_filtered.at[idx, "LimType"] = constraint
+                                    if (
+                                        api_value is not None
+                                    ):  # Check if api_value is not None
+                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
 
     # print(times_df_filtered)
 
