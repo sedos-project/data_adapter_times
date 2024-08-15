@@ -4,6 +4,9 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
+# Initialize the counter
+fetch_data_counter = 0
+
 
 def format_and_save_excel(file_path, processed_df):
     """
@@ -168,18 +171,24 @@ def format_and_save_excel(file_path, processed_df):
 
 
 def fetch_data(url, process_name):
+    global fetch_data_counter
+    fetch_data_counter += 1  # Increment the counter
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            print(f"Data fetched successfully for process: {process_name}")
+            print(
+                f"Data fetched successfully for process {fetch_data_counter}: {process_name}"
+            )
             return pd.DataFrame(response.json())
         else:
             print(
-                f"Failed to fetch data for process: {process_name}, status code: {response.status_code}"
+                f"Failed to fetch data for process {fetch_data_counter}: {process_name}, status code: {response.status_code}"
             )
             return pd.DataFrame()  # Return an empty DataFrame if status code is not 200
     except requests.RequestException as e:
-        print(f"No data found for process: {process_name}, error: {e}")
+        print(
+            f"No data found for process {fetch_data_counter}: {process_name}, error: {e}"
+        )
         return pd.DataFrame()  # Return an empty DataFrame in case of error
 
 
@@ -205,31 +214,61 @@ def find_header_row(sheet, header_name):
     raise ValueError("Header row not found within the first 10 rows.")
 
 
-def data_mapping(times_df, process_name):
+def data_mapping(times_df, process_name, is_group=False):
     """
-    Fetches data from the API for a given process name and updates the times_df DataFrame.
+    Fetches data from the API for a given process name or group and updates the times_df DataFrame.
 
     Parameters:
     times_df (pandas.DataFrame): The DataFrame containing the initial data.
-    process_name (str): The name of the process to fetch and process data for.
+    process_name (str): The name of the process or process group to fetch and process data for.
+    is_group (bool): Flag indicating whether the process_name is a group.
 
     Returns:
     pandas.DataFrame: The updated DataFrame with the new data merged.
     """
-    # Filter for the specific process and keep track of the index range
-    times_df_filtered = times_df[times_df["TechName"] == process_name]
-    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
-    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
-
-    # Fetch data from the API for the specific process
-    API_URL = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows"
-    api_process_data = fetch_data(API_URL, process_name)
+    api_process_data = fetch_data(
+        f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows",
+        process_name,
+    )
 
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
 
+    if is_group:
+        # Divide the data based on the 'type' column
+        process_groups = api_process_data.groupby("type")
+
+        process_count = 0  # Initialize a counter for the processes handled
+
+        for process, group_data in process_groups:
+            if process.endswith("_ag"):  # Skip processes ending with _ag
+                continue
+            handled_processes.append(process)
+            times_df = data_mapping_internal(
+                times_df, process, group_data
+            )  # Call internal function for each process
+            process_count += 1  # Increment the counter for each handled process
+
+        print(
+            f"{process_count} processes were handled inside the process group: {process_name}"
+        )
+        return times_df
+    else:
+        return data_mapping_internal(times_df, process_name, api_process_data)
+
+
+def data_mapping_internal(times_df, process_name, api_process_data):
+    # Filter for the specific process and keep track of the index range
+    times_df_filtered = times_df[times_df["TechName"] == process_name]
+    if times_df_filtered.empty:
+        print(f"{process_name} was not found in the input and hence was skipped")
+        return times_df  # Skip if there is no matching process
+
+    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
+    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
+
     # Load the mapping file
-    mapping_file_path = "mapping_v2.xlsx"
+    mapping_file_path = "config_data/mapping_v3.xlsx"
     wb = load_workbook(mapping_file_path, data_only=True)
     sheet = wb["SEDOS_parameters"]
 
@@ -301,7 +340,7 @@ def data_mapping(times_df, process_name):
                                 (
                                     (times_df_filtered["Attribute"] == times_col)
                                     | (times_df_filtered["Attribute"] == "OUTPUT")
-                                    | (times_df_filtered["Attribute"] == "ACT_EFF")
+                                    | (times_df_filtered["Attribute"] == "INPUT")
                                 )
                                 & (
                                     (times_df_filtered["Comm-IN"] == comm_col_value)
@@ -358,12 +397,12 @@ def data_mapping(times_df, process_name):
                                             api_value is not None
                                         ):  # Check if api_value is not None
                                             times_df_filtered.at[idx, str(year)] = (
-                                                api_value
+                                                api_value / 100
                                             )
                                             times_df_filtered.at[idx, "LimType"] = (
                                                 constraint
                                             )
-                                            sum_of_matched_values += api_value
+                                            sum_of_matched_values += api_value / 100
 
                                 # Handle the rows that do not match the flow share commodity
                                 for idx in matching_row.index:
@@ -372,7 +411,7 @@ def data_mapping(times_df, process_name):
                                         times_df_filtered.at[idx, "Comm-OUT"],
                                     ):
                                         times_df_filtered.at[idx, str(year)] = (
-                                            100 - sum_of_matched_values
+                                            1 - sum_of_matched_values
                                         )
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
@@ -434,24 +473,40 @@ def data_mapping(times_df, process_name):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "test_output_ind.xlsx"
+TIMES_FILE_PATH = "output_data/test_output_ind.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "times_df_ind.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_ind.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
 # format_and_save_excel("test_output_cmp.xlsx", times_df)
 
 # Create a copy of times_df to work with
 updated_df = times_df.copy()
 
+# Pre-defined process groups to handle
+process_groups = [
+    "exo_other_ind",  # Add other process groups here if needed
+]
+
+# Define a global list to keep track of processes that have been handled
+handled_processes = []
+
+# Handle pre-defined process groups first
+for process_group in process_groups:
+    updated_df = data_mapping(updated_df, process_group, is_group=True)
+
 # Fetch and process data for each unique process in the TechName column that starts with 'ind'
 unique_processes = times_df["TechName"].unique()
 ind_processes = [process for process in unique_processes if process.startswith("ind")]
 
+# Skip processes that end with '_ag'
+ind_processes = [process for process in ind_processes if not process.endswith("_ag")]
+
 for process in ind_processes:
-    updated_df = data_mapping(
-        updated_df, process
-    )  # Perform data mapping and update updated_df
+    if process not in handled_processes:
+        updated_df = data_mapping(
+            updated_df, process
+        )  # Perform data mapping and update updated_df
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 print("Excel file saved")

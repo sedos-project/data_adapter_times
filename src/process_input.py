@@ -20,15 +20,19 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
     attributes = []
     comm_grps = []
     comm_grp_elements = {}  # Dictionary to store comm_grps with their elements
-
+    counter = 0
     bracket_pattern = re.compile(r"\[([^]]+)\]")
     remove_pattern = re.compile(r"\b(pri_|sec_|iip_|exo_|emi_)")
 
     for _, row in original_df.iterrows():
         process = row.get("process", None)
+        if process is None or not process.lower().startswith("ind"):
+            continue  # Skip this row if the process does not start with 'ind'
+
         input_str = str(row.get("input", "")) if pd.notna(row.get("input")) else ""
         output_str = str(row.get("output", "")) if pd.notna(row.get("output")) else ""
 
+        counter += 1
         # Find and clean the bracketed items for the CommGrp value
         bracketed_items = bracket_pattern.findall(input_str)
         cleaned_bracketed_items = [
@@ -128,6 +132,7 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
     for key in comm_grp_elements.keys():
         comm_grp_elements[key] = list(comm_grp_elements[key])
 
+    print(f"Process counter:{counter}")
     return df, comm_grp_elements
 
 
@@ -215,8 +220,8 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Load the commodity_set data from mapping_v2.xlsx
-    wb_mapping = load_workbook("mapping_v2.xlsx", data_only=True)
+    # Load the commodity_set data from mapping_v3.xlsx
+    wb_mapping = load_workbook("config_data/mapping_v3.xlsx", data_only=True)
     ws_mapping = wb_mapping["commodity_set"]
 
     # Find the header row dynamically
@@ -363,7 +368,7 @@ def add_process_sheet_to_workbook(file_path, processed_df):
     for _, row in processed_df.iterrows():
         tech_name = row["TechName"]
         output_commodities = row["Comm-OUT"]
-        if "chp" in tech_name.lower():
+        if "_chp_" in tech_name.lower():
             process_sets[tech_name] = "CHP"
         elif pd.notna(output_commodities) and "exo" in output_commodities.lower():
             process_sets[tech_name] = "DEM"
@@ -489,28 +494,28 @@ def create_blank_excel(file_path):
 
 
 # Load the original DataFrame
-SEDOS_FILE = pd.read_excel("test_data_ind.xlsx", sheet_name="Processes_O1")
+SEDOS_FILE = pd.read_excel("input_data/test_data.xlsx", sheet_name="Process_Set")
 
 # Process the data
 times_df, commodity_groups = process_data(SEDOS_FILE)
 print(times_df)
 
 # Define the path for the pickle file
-PICKLE_FILE_PATH = "times_df_ind.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_ind.pkl"
 # Save the times_df DataFrame as a pickle file
 times_df.to_pickle(PICKLE_FILE_PATH)
 print(f"times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
 
 # Path to the SysSettings.xlsx
-SYS_SETTINGS_PATH = "SysSettings.xlsx"
+SYS_SETTINGS_PATH = "config_data/SysSettings.xlsx"
 # Update the commodity groups in the SysSettings file
 update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
-TIMES_FILE_PATH = "test_output_ind.xlsx"
+TIMES_FILE_PATH = "output_data/test_output_ind.xlsx"
 create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 
-print(f"Excel file saved")
+print("Excel file saved")
