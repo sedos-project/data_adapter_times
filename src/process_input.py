@@ -29,11 +29,14 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         if process is None or not process.lower().startswith("ind"):
             continue  # Skip this row if the process does not start with 'ind'
 
+        if process.endswith("_ag"):
+            continue  # Skip this row if the process ends with 'ag'
+
         input_str = str(row.get("input", "")) if pd.notna(row.get("input")) else ""
         output_str = str(row.get("output", "")) if pd.notna(row.get("output")) else ""
 
         counter += 1
-        # Find and clean the bracketed items for the CommGrp value
+        # Find and clean the bracketed items for the CommGrp value from input_str
         bracketed_items = bracket_pattern.findall(input_str)
         cleaned_bracketed_items = [
             remove_pattern.sub("", item)
@@ -68,7 +71,37 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
                     else:
                         comm_grp_elements[comm_grp_str] = set(elements)
 
-        # Process the non-bracketed items normally
+        # Now process the output_str for bracketed items, similar to input_str
+        output_bracketed_items = bracket_pattern.findall(output_str)
+        cleaned_output_bracketed_items = [
+            remove_pattern.sub("", item)
+            for bracketed_item in output_bracketed_items
+            for item in bracketed_item.split(",")
+        ]
+
+        comm_grp_str_out = (
+            "cg_" + "_".join(cleaned_output_bracketed_items)
+            if cleaned_output_bracketed_items
+            else ""
+        )
+
+        if output_bracketed_items:
+            # Append FLO_SHAR attributes for each bracketed item in output_str
+            for original_item in output_bracketed_items:
+                elements = [item.strip() for item in original_item.split(",")]
+                for item in elements:
+                    technology_names.append(process)
+                    comms_in.append(None)
+                    comms_out.append(item)
+                    attributes.append("OUTPUT")
+                    comm_grps.append(None)
+                    # Collect elements for the comm_grp
+                    if comm_grp_str_out in comm_grp_elements:
+                        comm_grp_elements[comm_grp_str_out].add(item)
+                    else:
+                        comm_grp_elements[comm_grp_str_out] = set(elements)
+
+        # Process the non-bracketed items in input_str normally
         for inp in re.sub(bracket_pattern, "", input_str).split(","):
             inp = inp.strip()
             if inp:  # Check if the input item is not an empty string after stripping
@@ -78,7 +111,8 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
                 attributes.append("INPUT")
                 comm_grps.append("")
 
-        for out in output_str.split(","):
+        # Process the non-bracketed items in output_str
+        for out in re.sub(bracket_pattern, "", output_str).split(","):
             out = out.strip()
             if out:  # Check if the output item is not an empty string after stripping
                 technology_names.append(process)
@@ -132,7 +166,8 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
     for key in comm_grp_elements.keys():
         comm_grp_elements[key] = list(comm_grp_elements[key])
 
-    print(f"Process counter:{counter}")
+    print(f"Process counter: {counter}")
+    print(comm_grp_elements)
     return df, comm_grp_elements
 
 
@@ -192,7 +227,7 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
 
     subheaders = [
         "I: Commodity Set Membership",
-        "Commodity Name",
+        "*Commodity Name",
         "Commodity Description",
         "Unit",
         "Balance Equ Type Override",
@@ -335,7 +370,7 @@ def add_process_sheet_to_workbook(file_path, processed_df):
 
     subheaders = [
         "I: Process Set Membership",
-        "Technology Name",
+        "*Technology Name",
         "Technology Description",
         "Activity Unit",
         "Capacity Unit",
