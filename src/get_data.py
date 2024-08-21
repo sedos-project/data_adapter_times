@@ -416,6 +416,42 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
+                        elif (
+                            "availability_constant" in sedos_item
+                            or "availability_timeseries_fixed" in sedos_item
+                        ):
+                            # Handle availability constants or time series fixed
+                            matching_row = times_df_filtered[
+                                times_df_filtered["Attribute"] == times_col
+                            ]
+                            if matching_row.empty:
+                                # Add a new row if the Attribute does not exist
+                                new_row = pd.Series(
+                                    {col: pd.NA for col in times_df_filtered.columns}
+                                )
+                                new_row["TechName"] = process_name
+                                new_row["Attribute"] = times_col
+                                new_row["LimType"] = constraint
+                                times_df_filtered = pd.concat(
+                                    [times_df_filtered, new_row.to_frame().T],
+                                    ignore_index=True,
+                                )
+                                new_row_idx = times_df_filtered[
+                                    times_df_filtered["Attribute"] == times_col
+                                ].index[-1]
+                                if api_value is not None:
+                                    times_df_filtered.at[new_row_idx, str(year)] = (
+                                        api_value / 100
+                                    )
+                            else:
+                                for idx in matching_row.index:
+                                    if api_value is not None:
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            api_value / 100
+                                        )
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
                         else:
                             # Check if only the Attribute matches
                             matching_row = times_df_filtered[
