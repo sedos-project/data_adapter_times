@@ -192,6 +192,33 @@ def fetch_data(url, process_name):
         return pd.DataFrame()  # Return an empty DataFrame in case of error
 
 
+def fetch_process_metadata(process):
+    """
+    Fetches the metadata of a process and extracts the units for all the resources.
+
+    Parameters:
+    process_name (str): The name of the process to fetch metadata for.
+
+    Returns:
+    dict: A dictionary where the keys are the resource names and the values are their corresponding units.
+    """
+    try:
+        url = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process}/meta/"
+        response = requests.get(url)
+        if response.status_code == 200:
+            metadata = response.json()
+            print(f"Units fetched successfully for process: {process}")
+            return metadata
+        else:
+            print(
+                f"Failed to fetch metadata for process: {process}, status code: {response.status_code}"
+            )
+            return {}
+    except requests.RequestException as e:
+        print(f"Error fetching metadata for process: {process}, error: {e}")
+        return {}
+
+
 def find_header_row(sheet, header_name):
     """
     This function finds the row number of the first occurrence of a specific header in a given sheet.
@@ -349,9 +376,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                             ]
                             if not matching_row.empty:
                                 for idx in matching_row.index:
-                                    if (
-                                        api_value is not None
-                                    ):  # Check if api_value is not None
+                                    if api_value is not None:
                                         times_df_filtered.at[idx, str(year)] = api_value
                             else:
                                 matching_row = times_df_filtered[
@@ -359,9 +384,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 ]
                                 if not matching_row.empty:
                                     for idx in matching_row.index:
-                                        if (
-                                            api_value is not None
-                                        ):  # Check if api_value is not None
+                                        if api_value is not None:
                                             times_df_filtered.at[idx, str(year)] = (
                                                 1 / api_value
                                             )
@@ -393,9 +416,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
                                     if flow_share_commodity in (comm_in, comm_out):
-                                        if (
-                                            api_value is not None
-                                        ):  # Check if api_value is not None
+                                        if api_value is not None:
                                             times_df_filtered.at[idx, str(year)] = (
                                                 api_value / 100
                                             )
@@ -472,23 +493,70 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 new_row_idx = times_df_filtered[
                                     times_df_filtered["Attribute"] == times_col
                                 ].index[-1]
-                                if (
-                                    api_value is not None
-                                ):  # Check if api_value is not None
+                                if api_value is not None:
                                     times_df_filtered.at[new_row_idx, str(year)] = (
                                         api_value
                                     )
                             else:
                                 for idx in matching_row.index:
-                                    if (
-                                        api_value is not None
-                                    ):  # Check if api_value is not None
+                                    if api_value is not None:
                                         times_df_filtered.at[idx, str(year)] = api_value
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
 
-    # print(times_df_filtered)
+    # Implement CAP2ACT logic
+    cap2act_value = pd.NA  # Default to empty if metadata is not fetched
+
+    # Fetch metadata
+    metadata = fetch_process_metadata(process_name)
+
+    if metadata:  # Check if metadata was successfully fetched
+        cap2act_value = 1  # Default CAP2ACT value if metadata is present
+
+        if process_name.endswith("_1"):
+            # Check if process has 'cost_in_p' field in schema->fields and if its unit is GW
+            resources = metadata.get("resources", [])
+            for resource in resources:
+                fields = resource.get("schema", {}).get("fields", [])
+                for field in fields:
+                    if field["name"] == "cost_in_p" and field.get("unit") == "GW":
+                        cap2act_value = 31.536
+                        break
+        elif process_name.endswith("_0"):
+            # Check if process has 'capacity_p_inst_0' field in schema->fields and if its unit is GW
+            resources = metadata.get("resources", [])
+            for resource in resources:
+                fields = resource.get("schema", {}).get("fields", [])
+                for field in fields:
+                    if (
+                        field["name"] == "capacity_p_inst_0"
+                        and field.get("unit") == "GW"
+                    ):
+                        cap2act_value = 31.536
+                        break
+
+    # Add CAP2ACT as a new row in times_df_filtered
+    cap2act_row = pd.Series(
+        {
+            "TechName": process_name,
+            "Attribute": "CAP2ACT",
+            "LimType": pd.NA,
+            "2021": cap2act_value,
+            "2024": cap2act_value,
+            "2027": cap2act_value,
+            "2030": cap2act_value,
+            "2035": cap2act_value,
+            "2040": cap2act_value,
+            "2045": cap2act_value,
+            "2050": cap2act_value,
+            "2060": cap2act_value,
+            "2070": cap2act_value,
+        }
+    )
+    times_df_filtered = pd.concat(
+        [times_df_filtered, cap2act_row.to_frame().T], ignore_index=True
+    )
 
     # Replace <NA> with empty strings before updating the original times_df
     with pd.option_context("future.no_silent_downcasting", True):
