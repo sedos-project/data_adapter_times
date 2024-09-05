@@ -170,6 +170,90 @@ def format_and_save_excel(file_path, processed_df):
     return file_path
 
 
+def convert_units(value, from_unit):
+    """
+    Convert the given value from its original unit to the desired target unit.
+    Uses pint for default units and handles user-defined units manually.
+
+    Parameters:
+    value (float): The numerical value to be converted.
+    from_unit (str): The original unit of the value.
+
+    Returns:
+    float: The converted value.
+    str: The unit of the converted value.
+    """
+    # Manual conversion mapping for user-defined units
+    manual_conversion_mapping = {
+        "t": ("Mt", 1e-6),
+        "Kt": ("Mt", 1e-3),
+        "Mt": ("Mt", 1.0),
+        "euro": ("million_euro", 1e-6),
+        "thousand_euro": ("million_euro", 1e-3),
+        "million_euro": ("million_euro", 1.0),
+        "euro/KW": ("million_euro/GW", 1.0),
+        "euro/MW": ("million_euro/GW", 1e-3),
+        "euro/GW": ("million_euro/GW", 1e-6),
+    }
+
+    # Handle manual conversions first
+    if from_unit in manual_conversion_mapping:
+        target_unit, scale_factor = manual_conversion_mapping[from_unit]
+        converted_value = value * scale_factor
+        return converted_value, target_unit
+
+    # Handle specific conversions for kilowatt, megawatt, and gigawatt
+    elif from_unit == "KW":
+        return value / 1e6, "GW"  # Convert kW to GW
+    elif from_unit == "MW":
+        return value / 1e3, "GW"  # Convert MW to GW
+    elif from_unit == "GW":
+        return value, "GW"  # GW remains as GW
+
+    # Handle specific conversions for kilowatt-hour, megawatt-hour, and gigawatt-hour to petajoule
+    elif from_unit == "KWh":
+        return value * 3.6e-9, "PJ"  # kWh to PJ
+    elif from_unit == "MWh":
+        return value * 3.6e-6, "PJ"  # MWh to PJ
+    elif from_unit == "GWh":
+        return value * 3.6e-3, "PJ"  # GWh to PJ
+    else:
+        print(f"Error: The unit '{from_unit}' is not recognized.")
+
+    return None, None
+
+
+def data_unit_conversion(api_data, metadata):
+    """
+    Converts the units of the fields in the API data according to the metadata.
+
+    Parameters:
+    api_data (pandas.DataFrame): The DataFrame containing the fetched API data.
+    metadata (dict): The metadata containing information about the units.
+
+    Returns:
+    pandas.DataFrame: The DataFrame with units converted to the standard units.
+    """
+    if api_data.empty or not metadata:
+        return api_data  # Return as is if no data or metadata is present
+
+    for resource in metadata.get("resources", []):
+        fields = resource.get("schema", {}).get("fields", [])
+        for field in fields:
+            field_name = field["name"]
+            field_unit = field.get("unit")
+            if field_name in api_data.columns and field_unit:
+                for index, value in api_data[field_name].iteritems():
+                    converted_value, target_unit = convert_units(value, field_unit)
+                    if converted_value is not None:
+                        api_data.at[index, field_name] = converted_value
+                        print(
+                            f"Converted {field_name} from {field_unit} to {target_unit}."
+                        )
+
+    return api_data
+
+
 def fetch_data(url, process_name):
     global fetch_data_counter
     fetch_data_counter += 1  # Increment the counter
@@ -207,12 +291,12 @@ def fetch_process_metadata(process):
         response = requests.get(url)
         if response.status_code == 200:
             metadata = response.json()
-            print(f"Units fetched successfully for process: {process}")
+            # print(f"Units fetched successfully for process: {process}")
             return metadata
         else:
-            print(
-                f"Failed to fetch metadata for process: {process}, status code: {response.status_code}"
-            )
+            # print(
+            #     f"Failed to fetch metadata for process: {process}, status code: {response.status_code}"
+            # )
             return {}
     except requests.RequestException as e:
         print(f"Error fetching metadata for process: {process}, error: {e}")
@@ -285,6 +369,12 @@ def data_mapping(times_df, process_name, is_group=False):
 
 
 def data_mapping_internal(times_df, process_name, api_process_data):
+
+    # Fetch metadata
+    # metadata = fetch_process_metadata(process_name)
+    # Perform unit conversion if metadata is available
+    # api_process_data = data_unit_conversion(api_process_data, metadata)
+
     # Filter for the specific process and keep track of the index range
     times_df_filtered = times_df[times_df["TechName"] == process_name]
     if times_df_filtered.empty:
@@ -520,7 +610,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
             for resource in resources:
                 fields = resource.get("schema", {}).get("fields", [])
                 for field in fields:
-                    if field["name"] == "cost_in_p" and field.get("unit") == "GW":
+                    if field["name"] == "cost_in_p" and field.get("unit") == "M€/GW":
                         cap2act_value = 31.536
                         break
         elif process_name.endswith("_0"):

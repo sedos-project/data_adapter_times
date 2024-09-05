@@ -278,9 +278,9 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         + processed_df["Comm-OUT"].dropna().unique().tolist()
     ):
         commodity_lower = commodity.lower()
-        if "exo" in commodity_lower:
+        if commodity_lower.startswith("exo_"):
             commodity_sets[commodity] = "DEM"
-        elif "emi" in commodity_lower:
+        elif commodity_lower.startswith("emi_"):
             commodity_sets[commodity] = "ENV"
         elif (
             commodity_lower in commodity_set_dict
