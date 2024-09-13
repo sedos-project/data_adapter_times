@@ -405,7 +405,7 @@ def add_process_sheet_to_workbook(file_path, processed_df):
         output_commodities = row["Comm-OUT"]
         if "_chp_" in tech_name.lower():
             process_sets[tech_name] = "CHP"
-        elif pd.notna(output_commodities) and "exo" in output_commodities.lower():
+        elif pd.notna(output_commodities) and "exo_" in output_commodities.lower():
             process_sets[tech_name] = "DEM"
         else:
             process_sets.setdefault(tech_name, "PRE")
