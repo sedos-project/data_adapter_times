@@ -26,8 +26,8 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
 
     for _, row in original_df.iterrows():
         process = row.get("process", None)
-        if process is None or not process.lower().startswith("ind"):
-            continue  # Skip this row if the process does not start with 'ind'
+        if process is None or not process.lower().startswith("tra"):
+            continue  # Skip this row if the process does not start with 'tra'
 
         if process.endswith("_ag"):
             continue  # Skip this row if the process ends with 'ag'

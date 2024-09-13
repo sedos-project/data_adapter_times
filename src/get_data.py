@@ -385,7 +385,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
 
     # Load the mapping file
-    mapping_file_path = "mapping_v3.xlsx"
+    mapping_file_path = "config_data/mapping_v3.xlsx"
     wb = load_workbook(mapping_file_path, data_only=True)
     sheet = wb["SEDOS_parameters"]
 
