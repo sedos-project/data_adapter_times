@@ -403,7 +403,10 @@ def add_process_sheet_to_workbook(file_path, processed_df):
     for _, row in processed_df.iterrows():
         tech_name = row["TechName"]
         output_commodities = row["Comm-OUT"]
-        if "_chp_" in tech_name.lower():
+        # Check for storage or battery in the process name
+        if "storage" in tech_name.lower() or "battery" in tech_name.lower():
+            process_sets[tech_name] = "STS"
+        elif "_chp_" in tech_name.lower():
             process_sets[tech_name] = "CHP"
         elif pd.notna(output_commodities) and "exo_" in output_commodities.lower():
             process_sets[tech_name] = "DEM"
