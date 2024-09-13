@@ -593,35 +593,23 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         )
 
     # Implement CAP2ACT logic
-    cap2act_value = pd.NA  # Default to empty if metadata is not fetched
+    # Check if any output commodities contain "exo_"
+    if any(
+        isinstance(comm_out, str) and "exo_" in comm_out.lower()
+        for comm_out in times_df_filtered["Comm-OUT"]
+    ):
+        cap2act_value = (
+            0.001  # Set CAP2ACT to 0.001 if "exo_" is in any output commodity
+        )
 
-    # Fetch metadata
-    metadata = fetch_process_metadata(process_name)
+    # Check if the process name contains "battery"
+    elif "battery" in process_name.lower():
+        cap2act_value = (
+            0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
+        )
 
-    if metadata:  # Check if metadata was successfully fetched
-        cap2act_value = 1  # Default CAP2ACT value if metadata is present
-
-        if process_name.endswith("_1"):
-            # Check if process has 'cost_in_p' field in schema->fields and if its unit is GW
-            resources = metadata.get("resources", [])
-            for resource in resources:
-                fields = resource.get("schema", {}).get("fields", [])
-                for field in fields:
-                    if field["name"] == "cost_in_p" and field.get("unit") == "M€/GW":
-                        cap2act_value = 31.536
-                        break
-        elif process_name.endswith("_0"):
-            # Check if process has 'capacity_p_inst_0' field in schema->fields and if its unit is GW
-            resources = metadata.get("resources", [])
-            for resource in resources:
-                fields = resource.get("schema", {}).get("fields", [])
-                for field in fields:
-                    if (
-                        field["name"] == "capacity_p_inst_0"
-                        and field.get("unit") == "GW"
-                    ):
-                        cap2act_value = 31.536
-                        break
+    else:
+        cap2act_value = 1  # Default CAP2ACT value
 
     # Add CAP2ACT as a new row in times_df_filtered
     cap2act_row = pd.Series(
