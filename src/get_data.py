@@ -6,6 +6,7 @@ from openpyxl.utils import get_column_letter
 
 # Initialize the counter
 fetch_data_counter = 0
+units_mapping = {}
 
 
 def format_and_save_excel(file_path, processed_df):
@@ -170,60 +171,7 @@ def format_and_save_excel(file_path, processed_df):
     return file_path
 
 
-def convert_units(value, from_unit):
-    """
-    Convert the given value from its original unit to the desired target unit.
-    Uses pint for default units and handles user-defined units manually.
-
-    Parameters:
-    value (float): The numerical value to be converted.
-    from_unit (str): The original unit of the value.
-
-    Returns:
-    float: The converted value.
-    str: The unit of the converted value.
-    """
-    # Manual conversion mapping for user-defined units
-    manual_conversion_mapping = {
-        "t": ("Mt", 1e-6),
-        "Kt": ("Mt", 1e-3),
-        "Mt": ("Mt", 1.0),
-        "euro": ("million_euro", 1e-6),
-        "thousand_euro": ("million_euro", 1e-3),
-        "million_euro": ("million_euro", 1.0),
-        "euro/KW": ("million_euro/GW", 1.0),
-        "euro/MW": ("million_euro/GW", 1e-3),
-        "euro/GW": ("million_euro/GW", 1e-6),
-    }
-
-    # Handle manual conversions first
-    if from_unit in manual_conversion_mapping:
-        target_unit, scale_factor = manual_conversion_mapping[from_unit]
-        converted_value = value * scale_factor
-        return converted_value, target_unit
-
-    # Handle specific conversions for kilowatt, megawatt, and gigawatt
-    elif from_unit == "KW":
-        return value / 1e6, "GW"  # Convert kW to GW
-    elif from_unit == "MW":
-        return value / 1e3, "GW"  # Convert MW to GW
-    elif from_unit == "GW":
-        return value, "GW"  # GW remains as GW
-
-    # Handle specific conversions for kilowatt-hour, megawatt-hour, and gigawatt-hour to petajoule
-    elif from_unit == "KWh":
-        return value * 3.6e-9, "PJ"  # kWh to PJ
-    elif from_unit == "MWh":
-        return value * 3.6e-6, "PJ"  # MWh to PJ
-    elif from_unit == "GWh":
-        return value * 3.6e-3, "PJ"  # GWh to PJ
-    else:
-        print(f"Error: The unit '{from_unit}' is not recognized.")
-
-    return None, None
-
-
-def data_unit_conversion(api_data, metadata):
+def data_units(metadata):
     """
     Converts the units of the fields in the API data according to the metadata.
 
@@ -234,24 +182,82 @@ def data_unit_conversion(api_data, metadata):
     Returns:
     pandas.DataFrame: The DataFrame with units converted to the standard units.
     """
-    if api_data.empty or not metadata:
-        return api_data  # Return as is if no data or metadata is present
+    units_dict = {}  # Initialize an empty dictionary to store units
+
+    if not metadata:
+        return units_dict  # Return as is if no data or metadata is present
 
     for resource in metadata.get("resources", []):
         fields = resource.get("schema", {}).get("fields", [])
         for field in fields:
             field_name = field["name"]
             field_unit = field.get("unit")
-            if field_name in api_data.columns and field_unit:
-                for index, value in api_data[field_name].iteritems():
-                    converted_value, target_unit = convert_units(value, field_unit)
-                    if converted_value is not None:
-                        api_data.at[index, field_name] = converted_value
-                        print(
-                            f"Converted {field_name} from {field_unit} to {target_unit}."
-                        )
+            if field_name and field_unit:
+                units_dict[field_name] = field_unit  # Store the field_name and unit
 
-    return api_data
+    return units_dict
+
+
+def update_commodity_list_units(excel_file_path, units_mapping):
+    """
+    Update the 'Commodity List' sheet in the Excel file with the units from units_mapping.
+    """
+    from openpyxl import load_workbook
+
+    # Load the Excel file
+    wb = load_workbook(excel_file_path)
+    if "Commodity List" in wb.sheetnames:
+        ws = wb["Commodity List"]
+    else:
+        print("Commodity List sheet not found in the Excel file.")
+        return
+
+    # Get header row
+    header_row = None
+    for row in ws.iter_rows(min_row=1, max_row=10, values_only=False):
+        for cell in row:
+            if cell.value == "CommName":
+                header_row = cell.row
+                break
+        if header_row is not None:
+            break
+
+    if header_row is None:
+        print("CommName header not found in Commodity List sheet.")
+        return
+
+    # Get column indices for CommName and Unit
+    headers = {cell.value: cell.column for cell in ws[header_row]}
+    if "CommName" in headers and "Unit" in headers:
+        commname_col = headers["CommName"]
+        unit_col = headers["Unit"]
+    else:
+        print("CommName or Unit column not found in Commodity List sheet.")
+        return
+
+    # For each field_name and field_unit in units_mapping
+    for field_name, field_unit in units_mapping.items():
+        # Only process field names starting with 'conversion_factor_'
+        if field_name.startswith("conversion_factor_"):
+            # Remove the 'conversion_factor_' prefix directly
+            comm_name = field_name[len("conversion_factor_") :]
+            found = False
+            for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
+                commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
+                if commname_cell.value and isinstance(commname_cell.value, str):
+                    if commname_cell.value.strip().lower() == comm_name.strip().lower():
+                        unit_cell = row[unit_col - 1]
+                        unit_cell.value = field_unit
+                        found = True
+                        break  # Assuming CommName is unique
+            if not found:
+                print(
+                    f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
+                )
+
+    # Save the workbook
+    wb.save(excel_file_path)
+    print("Commodity List sheet updated with units.")
 
 
 def fetch_data(url, process_name):
@@ -371,9 +377,11 @@ def data_mapping(times_df, process_name, is_group=False):
 def data_mapping_internal(times_df, process_name, api_process_data):
 
     # Fetch metadata
-    # metadata = fetch_process_metadata(process_name)
-    # Perform unit conversion if metadata is available
-    # api_process_data = data_unit_conversion(api_process_data, metadata)
+    metadata = fetch_process_metadata(process_name)
+
+    # Update units_mapping
+    global units_mapping
+    units_mapping.update(data_units(metadata))
 
     # Filter for the specific process and keep track of the index range
     times_df_filtered = times_df[times_df["TechName"] == process_name]
@@ -443,7 +451,6 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                 api_values = api_process_data[api_col]
                 years = api_process_data["year"]
                 comm_col_value = api_col.replace("conversion_factor_", "")
-
                 for api_value, year in zip(api_values, years):
                     # Find the column in times_df_filtered that matches the year
                     if str(year) in times_df_filtered.columns:
@@ -473,7 +480,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                     for idx in matching_row.index:
                                         if api_value is not None:
                                             times_df_filtered.at[idx, str(year)] = (
-                                                1 / api_value
+                                                api_value
                                             )
                         elif "flow_share" in sedos_item:
                             # Add flow share values
@@ -692,4 +699,5 @@ for process in tra_processes:
         )  # Perform data mapping and update updated_df
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
+update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
 print("Excel file saved")
