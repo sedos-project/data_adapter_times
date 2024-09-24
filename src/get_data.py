@@ -20,6 +20,10 @@ def format_and_save_excel(file_path, processed_df):
     Returns:
     str: The path where the Excel file is saved.
     """
+
+    # Replace pd.NA with empty strings
+    processed_df = processed_df.fillna("")
+
     wb = load_workbook(file_path)
     ws = wb.active
 
@@ -658,6 +662,195 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     return times_df
 
 
+def calculate_act_eff(times_df, process_list_file_path):
+    """
+    Calculates the ACT_EFF attribute for processes with 'DEM' in their Sets column.
+    If the 'INPUT' attribute is present, calculates 'ACT_EFF' and adds a new row.
+    If 'INPUT' is missing but 'ACT_EFF' is present, calculates 'ACT_EFF' and updates the existing 'ACT_EFF' row.
+    If neither 'INPUT' nor 'ACT_EFF' are present, skips the process.
+
+    Parameters:
+    times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
+    process_list_file_path (str): The path to the Excel file containing the 'Process List' sheet.
+
+    Returns:
+    pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
+    """
+    from openpyxl import load_workbook
+
+    # Read the Excel file and 'Process List' sheet
+    wb = load_workbook(process_list_file_path)
+    if "Process List" in wb.sheetnames:
+        ws = wb["Process List"]
+    else:
+        print("Process List sheet not found in the Excel file.")
+        return times_df  # Return original times_df if sheet not found
+
+    # Find the header row containing 'TechName' and 'Sets'
+    header_row = None
+    for row in ws.iter_rows(min_row=1, max_row=20):
+        for cell in row:
+            if cell.value == "TechName":
+                header_row = cell.row
+                break
+        if header_row is not None:
+            break
+
+    if header_row is None:
+        print("TechName header not found in Process List sheet.")
+        return times_df
+
+    # Get column indices for TechName and Sets
+    headers = {cell.value: idx for idx, cell in enumerate(ws[header_row], start=1)}
+    if "TechName" in headers and "Sets" in headers:
+        techname_col = headers["TechName"]
+        sets_col = headers["Sets"]
+    else:
+        print("TechName or Sets column not found in Process List sheet.")
+        return times_df
+
+    # For every TechName where Sets column has 'DEM' in it
+    dem_technames = []
+    for row in ws.iter_rows(min_row=header_row + 1, max_row=ws.max_row):
+        techname_cell = row[techname_col - 1]
+        sets_cell = row[sets_col - 1]
+        if techname_cell.value and sets_cell.value:
+            if "DEM" in str(sets_cell.value):
+                dem_technames.append(techname_cell.value)
+
+    # Collect process positions
+    process_positions = []
+    for process_name in dem_technames:
+        # Get the subset of times_df for this process_name
+        times_df_filtered = times_df[times_df["TechName"] == process_name]
+
+        if times_df_filtered.empty:
+            print(f"{process_name} was not found in times_df and hence was skipped")
+            continue  # Skip if no matching process
+
+        # Find the index positions in times_df where this process's data is located
+        process_indices = times_df_filtered.index
+        start_index = process_indices[0]
+        end_index = process_indices[-1]
+
+        # Add to list
+        process_positions.append((start_index, end_index, process_name))
+
+    # Sort the process_positions list in descending order of start_index
+    process_positions.sort(reverse=True)
+
+    # Now process each process in reverse order
+    for start_index, end_index, process_name in process_positions:
+        times_df_filtered = times_df.loc[start_index:end_index]
+
+        # Find the row which has 'Comm-OUT' starting with 'exo_'
+        exo_rows = times_df_filtered[
+            times_df_filtered["Comm-OUT"].astype(str).str.startswith("exo_")
+        ]
+        if exo_rows.empty:
+            print(f"No 'exo_' in 'Comm-OUT' for process {process_name}")
+            continue
+
+        exo_row = exo_rows.iloc[0]  # Take the first one
+
+        # Find the row which has 'ACTFLO~DEMO' in 'Attribute' column
+        actflo_demo_rows = times_df_filtered[
+            times_df_filtered["Attribute"] == "ACTFLO~DEMO"
+        ]
+        if actflo_demo_rows.empty:
+            print(f"No 'ACTFLO~DEMO' in 'Attribute' for process {process_name}")
+            continue
+
+        actflo_demo_row = actflo_demo_rows.iloc[0]
+
+        # Initialize a flag to check whether we need to create a new ACT_EFF row or update existing one
+        create_new_act_eff = False
+
+        # Find the first row which has 'INPUT' in 'Attribute' column
+        input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
+        if not input_rows.empty:
+            input_row = input_rows.iloc[0]
+            create_new_act_eff = True  # We will create a new ACT_EFF row
+        else:
+            # If 'INPUT' not found, check for 'ACT_EFF' attribute
+            act_eff_rows = times_df_filtered[
+                times_df_filtered["Attribute"] == "ACT_EFF"
+            ]
+            if act_eff_rows.empty:
+                print(
+                    f"No 'INPUT' or 'ACT_EFF' in 'Attribute' for process {process_name}"
+                )
+                continue  # Skip this process
+            else:
+                print(f"Using existing 'ACT_EFF' row for process {process_name}")
+                input_row = act_eff_rows.iloc[0]  # Use existing ACT_EFF row
+                create_new_act_eff = False  # We will update existing ACT_EFF row
+
+        # Now compute the ACT_EFF values for each year
+        act_eff_values = {}
+        years_columns = [
+            "2021",
+            "2024",
+            "2027",
+            "2030",
+            "2035",
+            "2040",
+            "2045",
+            "2050",
+            "2060",
+            "2070",
+        ]
+        for year in years_columns:
+            try:
+                exo_value = float(exo_row[year])
+                actflo_demo_value = float(actflo_demo_row[year])
+                input_value = float(input_row[year])
+
+                # Compute the value
+                act_eff = exo_value / actflo_demo_value / input_value
+
+                act_eff_values[year] = act_eff
+            except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                # Handle any errors, set value to empty string
+                act_eff_values[year] = ""
+
+        if create_new_act_eff:
+            # Create a new ACT_EFF row and insert after end_index
+            new_row = {
+                col: "" for col in times_df.columns
+            }  # Initialize with empty strings
+            new_row["TechName"] = process_name
+            new_row["Attribute"] = "ACT_EFF"
+
+            # Set the values for the years
+            for year, value in act_eff_values.items():
+                new_row[year] = value
+
+            # Convert new_row to DataFrame
+            new_row_df = pd.DataFrame([new_row])
+
+            # Insert new_row_df into times_df after end_index
+            # Split times_df into before, new_row_df, after
+            times_df = pd.concat(
+                [
+                    times_df.iloc[: end_index + 1],
+                    new_row_df,
+                    times_df.iloc[end_index + 1 :],
+                ]
+            ).reset_index(drop=True)
+        else:
+            # Update the existing ACT_EFF row with the new values
+            act_eff_index = input_row.name  # The index of the existing ACT_EFF row
+            for year, value in act_eff_values.items():
+                times_df.at[act_eff_index, year] = value
+
+    # Ensure there are no pd.NA values in times_df
+    times_df = times_df.fillna("")
+
+    # Return the updated times_df
+    return times_df
+
+
 # Paths and URLs
 TIMES_FILE_PATH = "output_data/test_output_tra.xlsx"
 
@@ -676,6 +869,9 @@ process_groups = [
     "tra_rail_pass_0",
     "tra_water_frei_0",
     "tra_water_frei_1",
+    "tra_rail_frei_0",
+    "tra_rail_frei_1",
+    "tra_rail_pass_1",
 ]
 
 # Define a global list to keep track of processes that have been handled
@@ -697,6 +893,9 @@ for process in tra_processes:
         updated_df = data_mapping(
             updated_df, process
         )  # Perform data mapping and update updated_df
+
+# Calculate ACT_EFF attributes
+updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
