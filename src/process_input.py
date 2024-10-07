@@ -45,7 +45,9 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         ]
 
         comm_grp_str = (
-            "cg_" + "_".join(cleaned_bracketed_items) if cleaned_bracketed_items else ""
+            "cg_" + "_".join([item[0] for item in cleaned_bracketed_items if item])
+            if cleaned_bracketed_items
+            else ""
         )
 
         if bracketed_items:
@@ -80,7 +82,8 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         ]
 
         comm_grp_str_out = (
-            "cg_" + "_".join(cleaned_output_bracketed_items)
+            "cg_"
+            + "_".join([item[0] for item in cleaned_output_bracketed_items if item])
             if cleaned_output_bracketed_items
             else ""
         )
@@ -473,6 +476,7 @@ def update_commodity_groups(file_path, comm_grps):
     header_row = find_header_row(ws, "Name")
     name_col = None
     cset_cn_col = None
+    all_regions_col = None  # New column for 'AllRegions'
 
     # Scan the found header row to locate the correct columns based on header names
     for col in range(1, ws.max_column + 1):
@@ -481,9 +485,11 @@ def update_commodity_groups(file_path, comm_grps):
             name_col = col
         elif header_value.strip().lower() == "cset_cn":
             cset_cn_col = col
+        elif header_value.strip().lower() == "allregions":  # Find AllRegions column
+            all_regions_col = col
 
     # Validate that the necessary columns were found
-    if not name_col or not cset_cn_col:
+    if not name_col or not cset_cn_col or not all_regions_col:
         raise ValueError("Required columns not found in the sheet")
 
     # Create a set to track existing commodity names for quick lookup
@@ -506,6 +512,9 @@ def update_commodity_groups(file_path, comm_grps):
             ws.cell(row=row_idx, column=cset_cn_col).value = ", ".join(
                 elements
             )  # Cset_CN
+            ws.cell(row=row_idx, column=all_regions_col).value = (
+                "y"  # AllRegions set to 'y'
+            )
             row_idx += 1
 
     # Save the workbook
