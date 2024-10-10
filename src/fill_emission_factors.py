@@ -5,12 +5,19 @@ import os
 
 # Define the file path for output
 SCEN_EMISSION_FILE_PATH = "output_data/Scen_emission_all.xlsx"
+CO2_EMISSION_FILE_PATH = "output_data/vt_DE_CO2_Emission.xlsx"
 
 # Initialize a set to track handled processes
 handled_processes = set()
 
 # Global variable for start_row
 start_row = None
+
+# Global variable for global_emission_data (fetched once at the beginning)
+global_emission_data = None
+
+# Data collection for batch processing
+emi_co2_f_data = []
 
 
 def fetch_data(url, process_name):
@@ -30,6 +37,93 @@ def fetch_data(url, process_name):
     except requests.RequestException as e:
         print(f"Error fetching data for process: {process_name}, error: {e}")
         return pd.DataFrame()
+
+
+def process_emi_co2_f(other_indexes, remaining_string, global_emission_data):
+    """
+    Handles the logic when 'emi_co2_f_' is detected.
+    Collects the data to be inserted later in batch.
+    """
+    if remaining_string in global_emission_data.columns:
+        # Get the value from the 7th row in the global emission factors
+        global_value = global_emission_data[remaining_string].iloc[6]
+        # Collect data as a new column to be inserted later
+        emi_co2_f_data.append(
+            [
+                other_indexes,
+                remaining_string,
+                "",  # Leave the units row unchanged
+                global_value,
+                global_value,
+                global_value,
+                global_value,
+            ]
+        )
+
+
+def batch_insert_emi_co2_f_data():
+    """
+    Inserts all collected emi_co2_f_ data into the CO2 Emission Excel file in one go, ensuring unique combinations
+    of `other_indexes` and `remaining_strings` are inserted.
+    """
+    # Load the CO2 Emission Excel file
+    wb_co2 = load_workbook(CO2_EMISSION_FILE_PATH)
+    if "emission" not in wb_co2.sheetnames:
+        print("emission sheet not found.")
+        return
+    ws_co2 = wb_co2["emission"]
+
+    # Find the CommName header and corresponding column
+    header_row_co2 = find_header_row(ws_co2, "CommName")
+    comm_name_col = None
+    for col in range(1, ws_co2.max_column + 1):
+        if ws_co2.cell(row=header_row_co2, column=col).value == "CommName":
+            comm_name_col = col
+            break
+
+    if comm_name_col is None:
+        print("CommName header not found.")
+        return
+
+    # Track unique combinations of other_indexes and remaining_strings
+    unique_combinations = set()
+
+    # Insert collected data as new columns
+    start_col = comm_name_col + 1  # Start after the CommName column
+
+    for data in emi_co2_f_data:
+        # `data` contains [other_indexes, remaining_string, "", value1, value2, value3, value4]
+
+        other_indexes = data[0]
+        remaining_string = data[1]
+        values = data[3:]  # The values to be inserted
+
+        # Create a tuple for unique combination check
+        combo = (other_indexes, remaining_string)
+
+        # Only insert if this combination has not been inserted before
+        if combo not in unique_combinations:
+            # Add the combination to the set to prevent duplicates
+            unique_combinations.add(combo)
+
+            # Insert remaining string one row above the `other_indexes`
+            ws_co2.cell(
+                row=header_row_co2 - 1, column=start_col, value=remaining_string
+            )
+
+            # Insert the other_indexes on the row just below the remaining_string
+            ws_co2.cell(row=header_row_co2, column=start_col, value=other_indexes)
+
+            # Insert values in the next four rows below the `other_indexes`
+            for i, value in enumerate(values):
+                ws_co2.cell(row=header_row_co2 + 2 + i, column=start_col, value=value)
+
+            # Move to the next column for the next batch of data
+            start_col += 1
+
+    # Save the CO2 Emission file after all modifications
+    wb_co2.save(CO2_EMISSION_FILE_PATH)
+    print(f"Batch insertion completed and saved to {CO2_EMISSION_FILE_PATH}.")
 
 
 def find_header_row(sheet, header_name):
@@ -116,40 +210,50 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
             other_indexes = col_parts[0].replace("ef_", "")
             cset_cn = "emi_" + col_parts[1]
 
-            # Skip columns where Cset_CN contains 'emi_co2_f_'
+            # Detect when 'emi_co2_f_' occurs
             if "emi_co2_f_" in cset_cn:
-                continue
+                # Get the value from the 7th row of the API data
+                api_value = api_data[api_col].iloc[6]
 
-            # Determine the value to be pasted in the Attribute column
-            attribute_value = (
-                "ENV_ACT" if "_p_" in cset_cn or "_proc_" in cset_cn else "FLO_EMIS"
-            )
+                # Remove 'global_emission_factors.' and keep the remaining string
+                if "global_emission_factors." in api_value:
+                    remaining_string = api_value.replace("global_emission_factors.", "")
+                    # Call the process_emi_co2_f function to handle this case, collecting data in memory
+                    process_emi_co2_f(
+                        other_indexes, remaining_string, global_emission_data
+                    )
 
-            # Get the value from the first row of the api_col
-            api_value = (
-                api_data[api_col].iloc[6] if not api_data[api_col].empty else None
-            )
-
-            # If there is a value, add it to the worksheet
-            if api_value is not None:
-                ws.cell(
-                    row=start_row,
-                    column=col_indices["Attribute"],
-                    value=attribute_value,
-                )
-                ws.cell(
-                    row=start_row,
-                    column=col_indices["Other_Indexes"],
-                    value=other_indexes,
-                )
-                ws.cell(row=start_row, column=col_indices["Cset_CN"], value=cset_cn)
-                ws.cell(
-                    row=start_row, column=col_indices["Pset_PN"], value=process_name
-                )
-                ws.cell(row=start_row, column=col_indices["DE"], value=api_value)
-                start_row += 1
             else:
-                print(f"No value found for {api_col} in process {process_name}")
+                # Determine the value to be pasted in the Attribute column
+                attribute_value = (
+                    "ENV_ACT" if "_p_" in cset_cn or "_proc_" in cset_cn else "FLO_EMIS"
+                )
+
+                # Get the value from the first row of the api_col
+                api_value = (
+                    api_data[api_col].iloc[6] if not api_data[api_col].empty else None
+                )
+
+                # If there is a value, add it to the worksheet
+                if api_value is not None:
+                    ws.cell(
+                        row=start_row,
+                        column=col_indices["Attribute"],
+                        value=attribute_value,
+                    )
+                    ws.cell(
+                        row=start_row,
+                        column=col_indices["Other_Indexes"],
+                        value=other_indexes,
+                    )
+                    ws.cell(row=start_row, column=col_indices["Cset_CN"], value=cset_cn)
+                    ws.cell(
+                        row=start_row, column=col_indices["Pset_PN"], value=process_name
+                    )
+                    ws.cell(row=start_row, column=col_indices["DE"], value=api_value)
+                    start_row += 1
+                else:
+                    print(f"No value found for {api_col} in process {process_name}")
 
 
 def process_group_or_individual(process_name, ws, is_group=False):
@@ -199,6 +303,28 @@ def process_group_or_individual(process_name, ws, is_group=False):
 
 def main():
     global start_row  # Declare global so it can be used across functions
+    global global_emission_data  # Declare global emission data variable
+
+    # Fetch the global emission data once
+    global_emission_url = "https://openenergyplatform.org/api/v0/schema/model_draft/tables/global_emission_factors/rows"
+
+    try:
+        response = requests.get(global_emission_url)
+        if response.status_code == 200:
+            print(f"Data fetched successfully for global emission factors")
+            global_emission_data = pd.DataFrame(response.json())
+        else:
+            print(
+                f"Failed to fetch data for global emission factors, status code: {response.status_code}"
+            )
+            global_emission_data = pd.DataFrame()
+    except requests.RequestException as e:
+        print(f"Error fetching data for global emission factors, error: {e}")
+        global_emission_data = pd.DataFrame()
+
+    if global_emission_data.empty:
+        print("Global emission data could not be fetched. Exiting.")
+        return
 
     # Load the existing workbook with openpyxl to read the existing structure
     wb = load_workbook(SCEN_EMISSION_FILE_PATH)
@@ -240,6 +366,9 @@ def main():
     # Save the workbook after making updates
     wb.save(SCEN_EMISSION_FILE_PATH)
     print(f"Emission data processing completed and saved to {SCEN_EMISSION_FILE_PATH}.")
+
+    # Perform the batch insert for emi_co2_f_ data
+    batch_insert_emi_co2_f_data()
 
 
 if __name__ == "__main__":
