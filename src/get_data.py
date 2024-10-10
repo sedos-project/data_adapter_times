@@ -593,9 +593,16 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                     times_df_filtered["Attribute"] == times_col
                                 ].index[-1]
                                 if api_value is not None:
-                                    times_df_filtered.at[new_row_idx, str(year)] = (
-                                        api_value
-                                    )
+                                    # If the sedos_item contains 'cb_coefficient', apply 1/api_value
+                                    if "cb_coefficient" in sedos_item:
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            1 / api_value
+                                        )
+                                    else:
+                                        # For all other cases, just use the api_value directly
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            api_value
+                                        )
                             else:
                                 for idx in matching_row.index:
                                     if api_value is not None:
