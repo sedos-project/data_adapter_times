@@ -170,7 +170,6 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         comm_grp_elements[key] = list(comm_grp_elements[key])
 
     print(f"Process counter: {counter}")
-    print(comm_grp_elements)
     return df, comm_grp_elements
 
 
@@ -537,6 +536,25 @@ def create_blank_excel(file_path):
     wb.save(file_path)
 
 
+def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    This function filters out rows from the DataFrame where the Attribute is 'OUTPUT'
+    and the Comm-OUT starts with 'emi_'.
+
+    Args:
+        df (pd.DataFrame): The original DataFrame.
+
+    Returns:
+        pd.DataFrame: The filtered DataFrame.
+    """
+    # Filter out rows where 'Attribute' is 'OUTPUT' and 'Comm-OUT' starts with 'emi_'
+    filtered_df = df[
+        ~((df["Attribute"] == "OUTPUT") & df["Comm-OUT"].str.startswith("emi_"))
+    ].copy()
+
+    return filtered_df
+
+
 # Load the original DataFrame
 SEDOS_FILE = pd.read_excel("input_data/test_data.xlsx", sheet_name="Process_Set")
 
@@ -544,11 +562,15 @@ SEDOS_FILE = pd.read_excel("input_data/test_data.xlsx", sheet_name="Process_Set"
 times_df, commodity_groups = process_data(SEDOS_FILE)
 print(times_df)
 
+# Apply the filter function to remove the rows where attribute is 'OUTPUT' and comm-out starts with 'emi_'
+times_df_filtered = filter_output_with_emi_commodities(times_df)
+
 # Define the path for the pickle file
 PICKLE_FILE_PATH = "output_data/times_df_ind.pkl"
-# Save the times_df DataFrame as a pickle file
-times_df.to_pickle(PICKLE_FILE_PATH)
-print(f"times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
+
+# Save the filtered times_df DataFrame as a pickle file
+times_df_filtered.to_pickle(PICKLE_FILE_PATH)
+print(f"Filtered times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
 
 # Path to the SysSettings.xlsx
 SYS_SETTINGS_PATH = "config_data/SysSettings.xlsx"
