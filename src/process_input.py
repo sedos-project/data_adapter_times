@@ -26,8 +26,8 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
 
     for _, row in original_df.iterrows():
         process = row.get("process", None)
-        if process is None or not process.lower().startswith("ind"):
-            continue  # Skip this row if the process does not start with 'ind'
+        if process is None or not process.lower().startswith("hea"):
+            continue  # Skip this row if the process does not start with 'hea'
 
         if process.endswith("_ag"):
             continue  # Skip this row if the process ends with 'ag'
@@ -566,7 +566,7 @@ print(times_df)
 times_df_filtered = filter_output_with_emi_commodities(times_df)
 
 # Define the path for the pickle file
-PICKLE_FILE_PATH = "output_data/times_df_ind.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_hea.pkl"
 
 # Save the filtered times_df DataFrame as a pickle file
 times_df_filtered.to_pickle(PICKLE_FILE_PATH)
@@ -579,7 +579,7 @@ update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
-TIMES_FILE_PATH = "output_data/vt_DE_ind.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_hea.xlsx"
 create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)

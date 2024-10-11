@@ -341,26 +341,56 @@ def main():
     start_row = header_row + 1  # Initialize start_row after clearing
 
     # Pre-defined process groups to handle
-    process_groups = ["exo_other_ind"]  # Add more process groups as needed
+    process_groups = [
+        "hea_hh_me1_existing_technologies",
+        "hea_hh_me2_existing_technologies",
+        "hea_hh_me3_existing_technologies",
+        "hea_scalar",
+        "hea_hh_re1_existing_technologies",
+        "hea_hh_re2_existing_technologies",
+        "hea_hh_re3_existing_technologies",
+        "hea_demand",
+        "hea_hh_ue1_new_technologies",
+        "hea_hh_ue2_new_technologies",
+        "hea_hh_ue3_new_technologies",
+        "hea_hh_un1_new_technologies",
+        "hea_hh_me1_new_technologies",
+        "hea_hh_me2_new_technologies",
+        "hea_hh_me3_new_technologies",
+        "hea_hh_mn1_new_technologies",
+        "hea_hh_ue1_existing_technologies",
+        "hea_hh_ue2_existing_technologies",
+        "hea_hh_ue3_existing_technologies",
+        "hea_hh_re1_new_technologies",
+        "hea_hh_re2_new_technologies",
+        "hea_hh_re3_new_technologies",
+        "hea_hh_rn1_new_technologies",
+        "hea_cts_t1e_new_technologies",
+        "hea_cts_t1n_new_technologies",
+        "hea_cts_t2e_new_technologies",
+        "hea_cts_t2n_new_technologies",
+        "hea_cts_t1e_existing_technologies",
+        "hea_cts_t2e_existing_technologies",
+    ]
 
     # Handle predefined process groups
     for process_group in process_groups:
         process_group_or_individual(process_group, ws, is_group=True)
 
-    # Fetch and process data for individual processes (e.g., starting with 'ind')
+    # Fetch and process data for individual processes (e.g., starting with 'hea')
     # Assuming times_df is pre-loaded or fetched from your initial pickle or Excel file
-    times_df = pd.read_pickle("output_data/times_df_ind.pkl")
+    times_df = pd.read_pickle("output_data/times_df_hea.pkl")
     unique_processes = times_df["TechName"].unique()
-    ind_processes = [
-        process for process in unique_processes if process.startswith("ind")
+    hea_processes = [
+        process for process in unique_processes if process.startswith("hea")
     ]
 
     # Skip processes that end with '_ag'
-    ind_processes = [
-        process for process in ind_processes if not process.endswith("_ag")
+    hea_processes = [
+        process for process in hea_processes if not process.endswith("_ag")
     ]
 
-    for process in ind_processes:
+    for process in hea_processes:
         process_group_or_individual(process, ws)
 
     # Save the workbook after making updates

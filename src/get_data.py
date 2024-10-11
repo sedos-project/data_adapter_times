@@ -683,10 +683,10 @@ def data_mapping_internal(times_df, process_name, api_process_data):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "output_data/vt_DE_ind.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_hea.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "output_data/times_df_ind.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_hea.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
 
 # Create a copy of times_df to work with
@@ -694,8 +694,37 @@ updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
 process_groups = [
-    "exo_other_ind",  # Add other process groups here if needed
+    "hea_hh_me1_existing_technologies",
+    "hea_hh_me2_existing_technologies",
+    "hea_hh_me3_existing_technologies",
+    "hea_scalar",
+    "hea_hh_re1_existing_technologies",
+    "hea_hh_re2_existing_technologies",
+    "hea_hh_re3_existing_technologies",
+    "hea_demand",
+    "hea_hh_ue1_new_technologies",
+    "hea_hh_ue2_new_technologies",
+    "hea_hh_ue3_new_technologies",
+    "hea_hh_un1_new_technologies",
+    "hea_hh_me1_new_technologies",
+    "hea_hh_me2_new_technologies",
+    "hea_hh_me3_new_technologies",
+    "hea_hh_mn1_new_technologies",
+    "hea_hh_ue1_existing_technologies",
+    "hea_hh_ue2_existing_technologies",
+    "hea_hh_ue3_existing_technologies",
+    "hea_hh_re1_new_technologies",
+    "hea_hh_re2_new_technologies",
+    "hea_hh_re3_new_technologies",
+    "hea_hh_rn1_new_technologies",
+    "hea_cts_t1e_new_technologies",
+    "hea_cts_t1n_new_technologies",
+    "hea_cts_t2e_new_technologies",
+    "hea_cts_t2n_new_technologies",
+    "hea_cts_t1e_existing_technologies",
+    "hea_cts_t2e_existing_technologies",
 ]
+
 
 # Define a global list to keep track of processes that have been handled
 handled_processes = []
@@ -704,14 +733,14 @@ handled_processes = []
 for process_group in process_groups:
     updated_df = data_mapping(updated_df, process_group, is_group=True)
 
-# Fetch and process data for each unique process in the TechName column that starts with 'ind'
+# Fetch and process data for each unique process in the TechName column that starts with 'hea'
 unique_processes = times_df["TechName"].unique()
-ind_processes = [process for process in unique_processes if process.startswith("ind")]
+hea_processes = [process for process in unique_processes if process.startswith("hea")]
 
 # Skip processes that end with '_ag'
-ind_processes = [process for process in ind_processes if not process.endswith("_ag")]
+hea_processes = [process for process in hea_processes if not process.endswith("_ag")]
 
-for process in ind_processes:
+for process in hea_processes:
     if process not in handled_processes:
         updated_df = data_mapping(
             updated_df, process
