@@ -1,7 +1,6 @@
 import pandas as pd
 import requests
 from openpyxl import load_workbook
-import os
 
 # Define the file path for output
 SCEN_EMISSION_FILE_PATH = "output_data/Scen_emission_all.xlsx"
