@@ -556,7 +556,7 @@ def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Load the original DataFrame
-SEDOS_FILE = pd.read_excel("input_data/test_data.xlsx", sheet_name="Process_Set")
+SEDOS_FILE = pd.read_excel("input_data/Modellstruktur.xlsx", sheet_name="Process_Set")
 
 # Process the data
 times_df, commodity_groups = process_data(SEDOS_FILE)
@@ -579,7 +579,7 @@ update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
-TIMES_FILE_PATH = "output_data/test_output_ind.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_ind.xlsx"
 create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)
