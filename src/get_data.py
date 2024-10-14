@@ -524,18 +524,6 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                             )
                                             sum_of_matched_values += api_value / 100
 
-                                # Handle the rows that do not match the flow share commodity
-                                for idx in matching_row.index:
-                                    if flow_share_commodity not in (
-                                        times_df_filtered.at[idx, "Comm-IN"],
-                                        times_df_filtered.at[idx, "Comm-OUT"],
-                                    ):
-                                        times_df_filtered.at[idx, str(year)] = (
-                                            1 - sum_of_matched_values
-                                        )
-                                        times_df_filtered.at[idx, "LimType"] = (
-                                            constraint
-                                        )
                         elif (
                             "availability_constant" in sedos_item
                             or "availability_timeseries_fixed" in sedos_item
