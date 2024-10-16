@@ -614,7 +614,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
             for resource in resources:
                 fields = resource.get("schema", {}).get("fields", [])
                 for field in fields:
-                    if field["name"] == "cost_in_p" and field.get("unit") == "M€/GW":
+                    if field["name"] == "cost_inv_p" and field.get("unit") == "M€/GW":
                         cap2act_value = 31.536
                         break
         elif process_name.endswith("_0"):
