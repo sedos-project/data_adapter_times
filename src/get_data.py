@@ -264,6 +264,69 @@ def update_commodity_list_units(excel_file_path, units_mapping):
     print("Commodity List sheet updated with units.")
 
 
+def update_process_list_sheet(excel_file_path, units_mapping):
+    """
+    Update the 'Process List' sheet in the Excel file with specific values:
+    - Set 'Vintage' to 'NO' for all rows.
+    - Set 'PrimaryCG' to the first output commodity for each process.
+    - Set 'Tact' to the unit of the first output commodity, as found in 'Commodity List' sheet.
+    """
+    # Load the workbook and sheets
+    wb = load_workbook(excel_file_path)
+    if "Process List" not in wb.sheetnames or "Commodity List" not in wb.sheetnames:
+        print("Required sheets not found in the Excel file.")
+        return
+
+    ws_process_list = wb["Process List"]
+    ws_commodity_list = wb["Commodity List"]
+
+    # Identify columns in 'Process List' sheet
+    header_row = find_header_row(ws_process_list, "TechName")
+    headers = {cell.value: cell.column for cell in ws_process_list[header_row]}
+
+    techname_col = headers.get("TechName")
+    vintage_col = headers.get("Vintage")
+    primary_cg_col = headers.get("PrimaryCG")
+    tact_col = headers.get("Tact")
+
+    if not (techname_col and vintage_col and primary_cg_col and tact_col):
+        print("Some required columns are missing in 'Process List' sheet.")
+        return
+
+    # Set Vintage column to 'NO' and populate PrimaryCG and Tact
+    for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
+        techname_cell = row[techname_col - 1]
+        if techname_cell.value:
+            process_name = techname_cell.value.strip()
+
+            # Set Vintage to 'NO'
+            row[vintage_col - 1].value = "NO"
+
+            # Set PrimaryCG to first output commodity and Tact to its unit from Commodity List
+            output_commodity = (
+                updated_df.loc[
+                    (updated_df["TechName"] == process_name)
+                    & (updated_df["Attribute"] == "OUTPUT"),
+                    "Comm-OUT",
+                ]
+                .dropna()
+                .values
+            )
+
+            if output_commodity.size > 0:  # Check if array is not empty
+                primary_cg = output_commodity[0]
+                row[primary_cg_col - 1].value = primary_cg
+
+                # Set Tact to the unit from Commodity List
+                row[tact_col - 1].value = units_mapping.get(
+                    f"conversion_factor_{primary_cg}", ""
+                )
+
+    # Save the workbook
+    wb.save(excel_file_path)
+    print("Process List sheet updated with Vintage, PrimaryCG, and Tact columns.")
+
+
 def fetch_data(url, process_name):
     global fetch_data_counter
     fetch_data_counter += 1  # Increment the counter
@@ -906,4 +969,5 @@ updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
+update_process_list_sheet(TIMES_FILE_PATH, units_mapping)
 print("Excel file saved")

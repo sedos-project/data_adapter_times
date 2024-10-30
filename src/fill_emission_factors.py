@@ -156,7 +156,14 @@ def get_column_indices(sheet, header_row):
     dict: A dictionary with column names as keys and their column indices as values.
     """
     headers = {cell.value: cell.column for cell in sheet[header_row]}
-    required_columns = ["Attribute", "Other_Indexes", "Cset_CN", "Pset_PN", "DE"]
+    required_columns = [
+        "Attribute",
+        "Other_Indexes",
+        "Cset_CN",
+        "Pset_PN",
+        "DE",
+        "Year",
+    ]
     if not all(col in headers for col in required_columns):
         raise ValueError("One or more required columns not found in the INS sheet.")
 
@@ -166,6 +173,7 @@ def get_column_indices(sheet, header_row):
         "Cset_CN": headers["Cset_CN"],
         "Pset_PN": headers["Pset_PN"],
         "DE": headers["DE"],
+        "Year": headers["Year"],
     }
 
 
@@ -198,6 +206,9 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
     if api_data.empty:
         print(f"No emission factors found for process {process_name}")
         return
+
+    # Define the sequence of years to be repeated
+    year_sequence = "2021,2024,2027,2030,2035,2040,2045,2050,2060,2070"
 
     for api_col in api_data.columns:
         if api_col.startswith("ef_"):
@@ -250,6 +261,9 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
                         row=start_row, column=col_indices["Pset_PN"], value=process_name
                     )
                     ws.cell(row=start_row, column=col_indices["DE"], value=api_value)
+                    ws.cell(
+                        row=start_row, column=col_indices["Year"], value=year_sequence
+                    )
                     start_row += 1
                 else:
                     print(f"No value found for {api_col} in process {process_name}")
