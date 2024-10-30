@@ -592,9 +592,16 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                     times_df_filtered["Attribute"] == times_col
                                 ].index[-1]
                                 if api_value is not None:
-                                    times_df_filtered.at[new_row_idx, str(year)] = (
-                                        api_value
-                                    )
+                                    # If the sedos_item contains 'cb_coefficient', apply 1/api_value
+                                    if "cb_coefficient" in sedos_item:
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            1 / api_value
+                                        )
+                                    else:
+                                        # For all other cases, just use the api_value directly
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            api_value
+                                        )
                             else:
                                 for idx in matching_row.index:
                                     if api_value is not None:
@@ -852,7 +859,7 @@ def calculate_act_eff(times_df, process_list_file_path):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "output_data/test_output_tra.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_tra.xlsx"
 
 # Read the pickle file and print the DataFrame
 PICKLE_FILE_PATH = "output_data/times_df_tra.pkl"

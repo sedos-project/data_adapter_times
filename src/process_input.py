@@ -45,7 +45,9 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         ]
 
         comm_grp_str = (
-            "cg_" + "_".join(cleaned_bracketed_items) if cleaned_bracketed_items else ""
+            "cg_" + "_".join([item[0] for item in cleaned_bracketed_items if item])
+            if cleaned_bracketed_items
+            else ""
         )
 
         if bracketed_items:
@@ -80,7 +82,8 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         ]
 
         comm_grp_str_out = (
-            "cg_" + "_".join(cleaned_output_bracketed_items)
+            "cg_"
+            + "_".join([item[0] for item in cleaned_output_bracketed_items if item])
             if cleaned_output_bracketed_items
             else ""
         )
@@ -167,7 +170,6 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         comm_grp_elements[key] = list(comm_grp_elements[key])
 
     print(f"Process counter: {counter}")
-    print(comm_grp_elements)
     return df, comm_grp_elements
 
 
@@ -476,6 +478,7 @@ def update_commodity_groups(file_path, comm_grps):
     header_row = find_header_row(ws, "Name")
     name_col = None
     cset_cn_col = None
+    all_regions_col = None  # New column for 'AllRegions'
 
     # Scan the found header row to locate the correct columns based on header names
     for col in range(1, ws.max_column + 1):
@@ -484,9 +487,11 @@ def update_commodity_groups(file_path, comm_grps):
             name_col = col
         elif header_value.strip().lower() == "cset_cn":
             cset_cn_col = col
+        elif header_value.strip().lower() == "allregions":  # Find AllRegions column
+            all_regions_col = col
 
     # Validate that the necessary columns were found
-    if not name_col or not cset_cn_col:
+    if not name_col or not cset_cn_col or not all_regions_col:
         raise ValueError("Required columns not found in the sheet")
 
     # Create a set to track existing commodity names for quick lookup
@@ -509,6 +514,9 @@ def update_commodity_groups(file_path, comm_grps):
             ws.cell(row=row_idx, column=cset_cn_col).value = ", ".join(
                 elements
             )  # Cset_CN
+            ws.cell(row=row_idx, column=all_regions_col).value = (
+                "y"  # AllRegions set to 'y'
+            )
             row_idx += 1
 
     # Save the workbook
@@ -531,18 +539,41 @@ def create_blank_excel(file_path):
     wb.save(file_path)
 
 
+def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    This function filters out rows from the DataFrame where the Attribute is 'OUTPUT'
+    and the Comm-OUT starts with 'emi_'.
+
+    Args:
+        df (pd.DataFrame): The original DataFrame.
+
+    Returns:
+        pd.DataFrame: The filtered DataFrame.
+    """
+    # Filter out rows where 'Attribute' is 'OUTPUT' and 'Comm-OUT' starts with 'emi_'
+    filtered_df = df[
+        ~((df["Attribute"] == "OUTPUT") & df["Comm-OUT"].str.startswith("emi_"))
+    ].copy()
+
+    return filtered_df
+
+
 # Load the original DataFrame
-SEDOS_FILE = pd.read_excel("input_data/test_data.xlsx", sheet_name="Process_Set")
+SEDOS_FILE = pd.read_excel("input_data/Modellstruktur.xlsx", sheet_name="Process_Set")
 
 # Process the data
 times_df, commodity_groups = process_data(SEDOS_FILE)
 print(times_df)
 
+# Apply the filter function to remove the rows where attribute is 'OUTPUT' and comm-out starts with 'emi_'
+times_df_filtered = filter_output_with_emi_commodities(times_df)
+
 # Define the path for the pickle file
 PICKLE_FILE_PATH = "output_data/times_df_tra.pkl"
-# Save the times_df DataFrame as a pickle file
-times_df.to_pickle(PICKLE_FILE_PATH)
-print(f"times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
+
+# Save the filtered times_df DataFrame as a pickle file
+times_df_filtered.to_pickle(PICKLE_FILE_PATH)
+print(f"Filtered times_df DataFrame saved as pickle file: {PICKLE_FILE_PATH}")
 
 # Path to the SysSettings.xlsx
 SYS_SETTINGS_PATH = "config_data/SysSettings.xlsx"
@@ -551,7 +582,7 @@ update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
-TIMES_FILE_PATH = "output_data/test_output_tra.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_tra.xlsx"
 create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)
