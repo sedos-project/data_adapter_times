@@ -1,12 +1,14 @@
 import pandas as pd
 import requests
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
+from unit_conversion import convert_unit
 
 # Initialize the counter
 fetch_data_counter = 0
 units_mapping = {}
+updated_units_mapping = {}
 
 
 def format_and_save_excel(file_path, processed_df):
@@ -180,24 +182,34 @@ def data_units(metadata):
     Converts the units of the fields in the API data according to the metadata.
 
     Parameters:
-    api_data (pandas.DataFrame): The DataFrame containing the fetched API data.
     metadata (dict): The metadata containing information about the units.
 
     Returns:
-    pandas.DataFrame: The DataFrame with units converted to the standard units.
+    dict: A dictionary where the keys are resource names and the values are lists of field names and units.
     """
-    units_dict = {}  # Initialize an empty dictionary to store units
+    units_dict = {}
 
     if not metadata:
-        return units_dict  # Return as is if no data or metadata is present
+        return units_dict
 
     for resource in metadata.get("resources", []):
+        resource_name = resource.get("name", "").replace(
+            "model_draft.", ""
+        )  # Remove "model_draft." prefix
         fields = resource.get("schema", {}).get("fields", [])
+
+        # Initialize the list for each resource if it doesn't exist
+        if resource_name not in units_dict:
+            units_dict[resource_name] = []
+
+        # Append each field and its unit as a dictionary to the resource's list
         for field in fields:
             field_name = field["name"]
             field_unit = field.get("unit")
             if field_name and field_unit:
-                units_dict[field_name] = field_unit  # Store the field_name and unit
+                units_dict[resource_name].append(
+                    {"field_name": field_name, "unit": field_unit}
+                )
 
     return units_dict
 
@@ -216,16 +228,7 @@ def update_commodity_list_units(excel_file_path, units_mapping):
         print("Commodity List sheet not found in the Excel file.")
         return
 
-    # Get header row
-    header_row = None
-    for row in ws.iter_rows(min_row=1, max_row=10, values_only=False):
-        for cell in row:
-            if cell.value == "CommName":
-                header_row = cell.row
-                break
-        if header_row is not None:
-            break
-
+    header_row = find_header_row(ws, "CommName")
     if header_row is None:
         print("CommName header not found in Commodity List sheet.")
         return
@@ -239,25 +242,29 @@ def update_commodity_list_units(excel_file_path, units_mapping):
         print("CommName or Unit column not found in Commodity List sheet.")
         return
 
-    # For each field_name and field_unit in units_mapping
-    for field_name, field_unit in units_mapping.items():
-        # Only process field names starting with 'conversion_factor_'
-        if field_name.startswith("conversion_factor_"):
-            # Remove the 'conversion_factor_' prefix directly
-            comm_name = field_name[len("conversion_factor_") :]
-            found = False
-            for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
-                commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
-                if commname_cell.value and isinstance(commname_cell.value, str):
-                    if commname_cell.value.strip().lower() == comm_name.strip().lower():
-                        unit_cell = row[unit_col - 1]
-                        unit_cell.value = field_unit
-                        found = True
-                        break  # Assuming CommName is unique
-            if not found:
-                print(
-                    f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
-                )
+    # Loop over each resource in units_mapping
+    for resource_name, fields in units_mapping.items():
+        for field in fields:
+            field_name = field["field_name"]
+            field_unit = field["unit"]
+            if field_name.startswith("conversion_factor_"):
+                comm_name = field_name[len("conversion_factor_") :]
+                found = False
+                for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
+                    commname_cell = row[commname_col - 1]
+                    if commname_cell.value and isinstance(commname_cell.value, str):
+                        if (
+                            commname_cell.value.strip().lower()
+                            == comm_name.strip().lower()
+                        ):
+                            unit_cell = row[unit_col - 1]
+                            unit_cell.value = field_unit
+                            found = True
+                            break
+                if not found:
+                    print(
+                        f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
+                    )
 
     # Save the workbook
     wb.save(excel_file_path)
@@ -317,14 +324,43 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 primary_cg = output_commodity[0]
                 row[primary_cg_col - 1].value = primary_cg
 
-                # Set Tact to the unit from Commodity List
-                row[tact_col - 1].value = units_mapping.get(
-                    f"conversion_factor_{primary_cg}", ""
-                )
+                # Find the Tact unit by searching the resource in units_mapping
+                for resource_name, fields in units_mapping.items():
+                    for field in fields:
+                        if field["field_name"] == f"conversion_factor_{primary_cg}":
+                            row[tact_col - 1].value = field["unit"]
+                            break
 
-    # Save the workbook
     wb.save(excel_file_path)
     print("Process List sheet updated with Vintage, PrimaryCG, and Tact columns.")
+
+
+def get_desired_unit_from_excel(
+    source_unit, file_path="output_data/units_mapping.xlsx"
+):
+    """
+    Reads the Unique Units sheet in the units_mapping.xlsx file to find the desired unit
+    corresponding to a given source unit.
+
+    Parameters:
+    source_unit (str): The unit to convert from.
+    file_path (str): The path to the units_mapping Excel file.
+
+    Returns:
+    str: The desired unit, if found; otherwise, returns None.
+    """
+    wb = load_workbook(file_path, data_only=True)
+    if "Unique Units" not in wb.sheetnames:
+        print("Unique Units sheet not found in the Excel file.")
+        return None
+
+    ws = wb["Unique Units"]
+
+    for row in ws.iter_rows(min_row=2, values_only=True):  # Skip header row
+        unit, desired_unit = row
+        if unit == source_unit:
+            return desired_unit
+    return None
 
 
 def fetch_data(url, process_name):
@@ -447,8 +483,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     metadata = fetch_process_metadata(process_name)
 
     # Update units_mapping
-    global units_mapping
+    global units_mapping, updated_units_mapping
     units_mapping.update(data_units(metadata))
+    updated_units_mapping.update(data_units(metadata))
 
     # Filter for the specific process and keep track of the index range
     times_df_filtered = times_df[times_df["TechName"] == process_name]
@@ -536,9 +573,56 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 )
                             ]
                             if not matching_row.empty:
+                                # Fetch unit from units_mapping by matching resource_name to process_name
+                                source_unit = None
+                                for resource_name, fields in units_mapping.items():
+                                    if resource_name == process_name:
+                                        for field in fields:
+                                            if (
+                                                field["field_name"]
+                                                == f"conversion_factor_{comm_col_value}"
+                                            ):
+                                                source_unit = field["unit"]
+                                                break
+                                        if source_unit:
+                                            break
+
+                                # If source unit is found, fetch the desired unit
+                                if source_unit:
+                                    desired_unit = get_desired_unit_from_excel(
+                                        source_unit,
+                                        file_path="config_data/units_mapping.xlsx",
+                                    )
+
+                                    # Only proceed with conversion if the desired unit is found
+                                    if desired_unit:
+                                        converted_value, conversion_flag = convert_unit(
+                                            api_value, source_unit, to_unit=desired_unit
+                                        )
+
+                                        if conversion_flag == 1:
+                                            for (
+                                                resource
+                                            ) in updated_units_mapping.values():
+                                                for field in resource:
+                                                    if (
+                                                        field["field_name"]
+                                                        == f"conversion_factor_{comm_col_value}"
+                                                    ):
+                                                        field["unit"] = desired_unit
+                                    else:
+                                        print(
+                                            f"Desired unit for {source_unit} not found."
+                                        )
+                                        converted_value = api_value
+                                else:
+                                    converted_value = api_value  # If no unit is found, use the value as is
+
                                 for idx in matching_row.index:
                                     if api_value is not None:
-                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            converted_value
+                                        )
                             else:
                                 matching_row = times_df_filtered[
                                     (times_df_filtered["Attribute"] == "ACT_EFF")
@@ -968,6 +1052,6 @@ for process in tra_processes:
 updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)
 
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
-update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
-update_process_list_sheet(TIMES_FILE_PATH, units_mapping)
+update_commodity_list_units(TIMES_FILE_PATH, updated_units_mapping)
+update_process_list_sheet(TIMES_FILE_PATH, updated_units_mapping)
 print("Excel file saved")
