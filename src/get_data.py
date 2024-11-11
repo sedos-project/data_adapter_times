@@ -587,6 +587,18 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                             )
                                             sum_of_matched_values += api_value / 100
 
+                                # Handle the rows that do not match the flow share commodity
+                                for idx in matching_row.index:
+                                    if flow_share_commodity not in (
+                                        times_df_filtered.at[idx, "Comm-IN"],
+                                        times_df_filtered.at[idx, "Comm-OUT"],
+                                    ):
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            1 - sum_of_matched_values
+                                        )
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
                         elif (
                             "availability_constant" in sedos_item
                             or "availability_timeseries_fixed" in sedos_item
@@ -677,7 +689,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
             for resource in resources:
                 fields = resource.get("schema", {}).get("fields", [])
                 for field in fields:
-                    if field["name"] == "cost_inv_p" and field.get("unit") == "M€/GW":
+                    if field["name"] == "cost_inv_p":
                         cap2act_value = 31.536
                         break
         elif process_name.endswith("_0"):
@@ -745,7 +757,9 @@ updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
 process_groups = [
-    "exo_other_ind",  # Add other process groups here if needed
+    "exo_other_ind",
+    "iip_autoproducer",
+    "iip_new_autoproducer",  # Add other process groups here if needed
 ]
 
 # Define a global list to keep track of processes that have been handled
