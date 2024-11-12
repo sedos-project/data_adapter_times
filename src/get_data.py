@@ -427,6 +427,10 @@ def data_mapping(times_df, process_name, is_group=False):
         for process, group_data in process_groups:
             if process.endswith("_ag"):  # Skip processes ending with _ag
                 continue
+
+            # Remove columns where all values are NaN (i.e., columns without any data)
+            group_data = group_data.dropna(axis=1, how="all")
+
             handled_processes.append(process)
             times_df = data_mapping_internal(
                 times_df, process, group_data
