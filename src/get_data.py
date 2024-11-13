@@ -956,13 +956,13 @@ def calculate_act_eff(times_df, process_list_file_path):
         ]
         for year in years_columns:
             try:
-                exo_value = float(exo_row[year])
-                actflo_demo_value = float(actflo_demo_row[year])
                 input_value = float(input_row[year])
-
-                # Compute the value
-                act_eff = exo_value / actflo_demo_value / input_value
-
+                if process_name.startswith("tra_road"):
+                    act_eff = input_value / 1000000000
+                else:
+                    exo_value = float(exo_row[year])
+                    actflo_demo_value = float(actflo_demo_row[year])
+                    act_eff = exo_value / actflo_demo_value / input_value
                 act_eff_values[year] = act_eff
             except (ValueError, ZeroDivisionError, KeyError, TypeError):
                 # Handle any errors, set value to empty string
@@ -998,7 +998,12 @@ def calculate_act_eff(times_df, process_list_file_path):
             for year, value in act_eff_values.items():
                 times_df.at[act_eff_index, year] = value
 
-    # Ensure there are no pd.NA values in times_df
+        # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes
+        for attr in ["INPUT", "OUTPUT"]:
+            attr_rows = times_df_filtered[times_df_filtered["Attribute"] == attr]
+            for idx in attr_rows.index:
+                times_df.loc[idx, years_columns] = ""
+
     times_df = times_df.fillna("")
 
     # Return the updated times_df

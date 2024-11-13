@@ -240,11 +240,18 @@ def get_conversion_factor(convert_from, convert_to):
 
 def convert_unit(value, from_unit, to_unit):
     try:
-        factor = get_conversion_factor(from_unit, to_unit)
-        return (value * factor), 1
+        if (from_unit == "kWh/km" and to_unit == "km/PJ") or (
+            from_unit == "kWh/100km" and to_unit == "km/PJ"
+        ):
+            factor = get_conversion_factor(from_unit, to_unit)
+            return (1 / (value * factor)), 1
+        else:
+            factor = get_conversion_factor(from_unit, to_unit)
+            return (value * factor), 0
+
     except UnitConversionError as e:
         print(f"Error in conversion: {e}")
-        return None, 0
+        return None
 
 
 # Define standard and energy model units
