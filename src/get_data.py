@@ -819,9 +819,8 @@ def data_mapping_internal(times_df, process_name, api_process_data):
 def calculate_act_eff(times_df, process_list_file_path):
     """
     Calculates the ACT_EFF attribute for processes with 'DEM' in their Sets column.
-    If the 'INPUT' attribute is present, calculates 'ACT_EFF' and adds a new row.
-    If 'INPUT' is missing but 'ACT_EFF' is present, calculates 'ACT_EFF' and updates the existing 'ACT_EFF' row.
-    If neither 'INPUT' nor 'ACT_EFF' are present, skips the process.
+    For 'tra_road' processes, calculates ACT_EFF directly as input_value / 1000000000.
+    For other processes, performs additional checks and calculations if 'INPUT' or 'ACTFLO~DEMO' are present.
 
     Parameters:
     times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
@@ -897,6 +896,74 @@ def calculate_act_eff(times_df, process_list_file_path):
     for start_index, end_index, process_name in process_positions:
         times_df_filtered = times_df.loc[start_index:end_index]
 
+        # Check if the process is 'tra_road' type
+        if process_name.startswith("tra_road"):
+            # For 'tra_road' processes, directly calculate ACT_EFF as input_value / 1000000000
+            input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
+            if input_rows.empty:
+                print(
+                    f"No 'INPUT' found for tra_road process {process_name}, skipping."
+                )
+                continue  # Skip if no input data
+
+            input_row = input_rows.iloc[0]
+            act_eff_values = {}
+            for year in [
+                "2021",
+                "2024",
+                "2027",
+                "2030",
+                "2035",
+                "2040",
+                "2045",
+                "2050",
+                "2060",
+                "2070",
+            ]:
+                try:
+                    input_value = float(input_row[year])
+                    act_eff_values[year] = input_value / 1000000000
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    act_eff_values[year] = ""
+
+            # Add ACT_EFF row for tra_road
+            new_row = {col: "" for col in times_df.columns}
+            new_row["TechName"] = process_name
+            new_row["Attribute"] = "ACT_EFF"
+            for year, value in act_eff_values.items():
+                new_row[year] = value
+            new_row_df = pd.DataFrame([new_row])
+            times_df = pd.concat(
+                [
+                    times_df.iloc[: end_index + 1],
+                    new_row_df,
+                    times_df.iloc[end_index + 1 :],
+                ]
+            ).reset_index(drop=True)
+
+            # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes for tra_road
+            for attr in ["INPUT", "OUTPUT"]:
+                attr_rows = times_df_filtered[times_df_filtered["Attribute"] == attr]
+                for idx in attr_rows.index:
+                    times_df.loc[
+                        idx,
+                        [
+                            "2021",
+                            "2024",
+                            "2027",
+                            "2030",
+                            "2035",
+                            "2040",
+                            "2045",
+                            "2050",
+                            "2060",
+                            "2070",
+                        ],
+                    ] = ""
+
+            continue  # Skip further processing for tra_road
+
+        # For other processes, proceed with the existing checks
         # Find the row which has 'Comm-OUT' starting with 'exo_'
         exo_rows = times_df_filtered[
             times_df_filtered["Comm-OUT"].astype(str).str.startswith("exo_")
@@ -934,11 +1001,9 @@ def calculate_act_eff(times_df, process_list_file_path):
                 print(
                     f"No 'INPUT' or 'ACT_EFF' in 'Attribute' for process {process_name}"
                 )
-                continue  # Skip this process
-            else:
-                print(f"Using existing 'ACT_EFF' row for process {process_name}")
-                input_row = act_eff_rows.iloc[0]  # Use existing ACT_EFF row
-                create_new_act_eff = False  # We will update existing ACT_EFF row
+                continue
+            input_row = act_eff_rows.iloc[0]
+            create_new_act_eff = False
 
         # Now compute the ACT_EFF values for each year
         act_eff_values = {}
@@ -957,12 +1022,9 @@ def calculate_act_eff(times_df, process_list_file_path):
         for year in years_columns:
             try:
                 input_value = float(input_row[year])
-                if process_name.startswith("tra_road"):
-                    act_eff = input_value / 1000000000
-                else:
-                    exo_value = float(exo_row[year])
-                    actflo_demo_value = float(actflo_demo_row[year])
-                    act_eff = exo_value / actflo_demo_value / input_value
+                exo_value = float(exo_row[year])
+                actflo_demo_value = float(actflo_demo_row[year])
+                act_eff = exo_value / actflo_demo_value / input_value
                 act_eff_values[year] = act_eff
             except (ValueError, ZeroDivisionError, KeyError, TypeError):
                 # Handle any errors, set value to empty string
