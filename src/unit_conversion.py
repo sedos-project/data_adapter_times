@@ -251,7 +251,7 @@ def convert_unit(value, from_unit, to_unit):
 
     except UnitConversionError as e:
         print(f"Error in conversion: {e}")
-        return None
+        return None, 0
 
 
 # Define standard and energy model units

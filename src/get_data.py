@@ -9,6 +9,33 @@ from unit_conversion import convert_unit
 fetch_data_counter = 0
 units_mapping = {}
 updated_units_mapping = {}
+desired_units_mapping = {}
+
+
+def load_desired_units_mapping(file_path="config_data/units_mapping.xlsx"):
+    """
+    Loads the source-desired unit pairs from the 'Unique Units' sheet into a dictionary.
+
+    Parameters:
+    file_path (str): The path to the units_mapping Excel file.
+
+    Returns:
+    dict: A dictionary where keys are source units, and values are desired units.
+    """
+    wb = load_workbook(file_path, data_only=True)
+    if "Unique Units" not in wb.sheetnames:
+        print("Unique Units sheet not found in the Excel file.")
+        return {}
+
+    ws = wb["Unique Units"]
+    units_dict = {}
+
+    for row in ws.iter_rows(min_row=2, values_only=True):  # Skip header row
+        unit, desired_unit = row
+        if unit and desired_unit:
+            units_dict[unit] = desired_unit
+
+    return units_dict
 
 
 def format_and_save_excel(file_path, processed_df):
@@ -589,11 +616,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
 
                                 # If source unit is found, fetch the desired unit
                                 if source_unit:
-                                    desired_unit = get_desired_unit_from_excel(
-                                        source_unit,
-                                        file_path="config_data/units_mapping.xlsx",
+                                    desired_unit = desired_units_mapping.get(
+                                        source_unit, None
                                     )
-
                                     # Only proceed with conversion if the desired unit is found
                                     if desired_unit:
                                         converted_value, conversion_flag = convert_unit(
@@ -628,10 +653,55 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                     (times_df_filtered["Attribute"] == "ACT_EFF")
                                 ]
                                 if not matching_row.empty:
+                                    # Fetch unit from units_mapping by matching resource_name to process_name
+                                    source_unit = None
+                                    for resource_name, fields in units_mapping.items():
+                                        if resource_name == process_name:
+                                            for field in fields:
+                                                if field["field_name"] == api_col:
+                                                    source_unit = field["unit"]
+                                                    break
+                                            if source_unit:
+                                                break
+
+                                    # If source unit is found, fetch the desired unit
+                                    if source_unit:
+                                        desired_unit = desired_units_mapping.get(
+                                            source_unit, None
+                                        )
+                                        # Only proceed with conversion if the desired unit is found
+                                        if desired_unit:
+                                            converted_value, conversion_flag = (
+                                                convert_unit(
+                                                    api_value,
+                                                    source_unit,
+                                                    to_unit=desired_unit,
+                                                )
+                                            )
+                                            print(converted_value, api_value)
+
+                                            if conversion_flag == 1:
+                                                for (
+                                                    resource
+                                                ) in updated_units_mapping.values():
+                                                    for field in resource:
+                                                        if (
+                                                            field["field_name"]
+                                                            == api_col
+                                                        ):
+                                                            field["unit"] = desired_unit
+                                        else:
+                                            print(
+                                                f"Desired unit for {source_unit} not found."
+                                            )
+                                            converted_value = api_value
+                                    else:
+                                        converted_value = api_value  # If no unit is found, use the value as is
+
                                     for idx in matching_row.index:
                                         if api_value is not None:
                                             times_df_filtered.at[idx, str(year)] = (
-                                                api_value
+                                                converted_value
                                             )
                         elif "flow_share" in sedos_item:
                             # Add flow share values
@@ -685,6 +755,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                         elif (
                             "availability_constant" in sedos_item
                             or "availability_timeseries_fixed" in sedos_item
+                            or "efficiency_sto_in" in sedos_item
                         ):
                             # Handle availability constants or time series fixed
                             matching_row = times_df_filtered[
@@ -752,7 +823,57 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                             else:
                                 for idx in matching_row.index:
                                     if api_value is not None:
-                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        # Fetch unit from units_mapping by matching resource_name to process_name
+                                        source_unit = None
+                                        for (
+                                            resource_name,
+                                            fields,
+                                        ) in units_mapping.items():
+                                            if resource_name == process_name:
+                                                for field in fields:
+                                                    if field["field_name"] == api_col:
+                                                        source_unit = field["unit"]
+                                                        break
+                                                if source_unit:
+                                                    break
+
+                                        # If source unit is found, fetch the desired unit
+                                        if source_unit:
+                                            desired_unit = desired_units_mapping.get(
+                                                source_unit, None
+                                            )
+                                            # Only proceed with conversion if the desired unit is found
+                                            if desired_unit:
+                                                converted_value, conversion_flag = (
+                                                    convert_unit(
+                                                        api_value,
+                                                        source_unit,
+                                                        to_unit=desired_unit,
+                                                    )
+                                                )
+
+                                                if conversion_flag == 1:
+                                                    for (
+                                                        resource
+                                                    ) in updated_units_mapping.values():
+                                                        for field in resource:
+                                                            if (
+                                                                field["field_name"]
+                                                                == api_col
+                                                            ):
+                                                                field["unit"] = (
+                                                                    desired_unit
+                                                                )
+                                            else:
+                                                print(
+                                                    f"Desired unit for {source_unit} not found."
+                                                )
+                                                converted_value = api_value
+                                        else:
+                                            converted_value = api_value  # If no unit is found, use the value as is
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            converted_value
+                                        )
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
@@ -898,15 +1019,27 @@ def calculate_act_eff(times_df, process_list_file_path):
 
         # Check if the process is 'tra_road' type
         if process_name.startswith("tra_road"):
-            # For 'tra_road' processes, directly calculate ACT_EFF as input_value / 1000000000
+            # For 'tra_road' processes, check for 'INPUT' or 'ACT_EFF' rows
             input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-            if input_rows.empty:
-                print(
-                    f"No 'INPUT' found for tra_road process {process_name}, skipping."
-                )
-                continue  # Skip if no input data
+            act_eff_rows = times_df_filtered[
+                times_df_filtered["Attribute"] == "ACT_EFF"
+            ]
+            flo_shar_rows = times_df_filtered[
+                times_df_filtered["Attribute"] == "FLO_SHAR"
+            ]
 
-            input_row = input_rows.iloc[0]
+            # Use 'ACT_EFF' as input if no 'INPUT' is found
+            if input_rows.empty and not act_eff_rows.empty and not flo_shar_rows.empty:
+                act_eff_row = act_eff_rows.iloc[0]
+                input_row = act_eff_row
+            elif not input_rows.empty:
+                input_row = input_rows.iloc[0]
+            else:
+                print(
+                    f"No 'INPUT' or 'ACT_EFF' found for tra_road process {process_name}, skipping."
+                )
+                continue  # Skip if no input or act_eff data
+
             act_eff_values = {}
             for year in [
                 "2021",
@@ -926,20 +1059,25 @@ def calculate_act_eff(times_df, process_list_file_path):
                 except (ValueError, ZeroDivisionError, KeyError, TypeError):
                     act_eff_values[year] = ""
 
-            # Add ACT_EFF row for tra_road
-            new_row = {col: "" for col in times_df.columns}
-            new_row["TechName"] = process_name
-            new_row["Attribute"] = "ACT_EFF"
-            for year, value in act_eff_values.items():
-                new_row[year] = value
-            new_row_df = pd.DataFrame([new_row])
-            times_df = pd.concat(
-                [
-                    times_df.iloc[: end_index + 1],
-                    new_row_df,
-                    times_df.iloc[end_index + 1 :],
-                ]
-            ).reset_index(drop=True)
+            if act_eff_rows.empty:
+                # Create a new EFF row if ACT_EFF was not originally present
+                new_row = {col: "" for col in times_df.columns}
+                new_row["TechName"] = process_name
+                new_row["Attribute"] = "EFF"
+                for year, value in act_eff_values.items():
+                    new_row[year] = value
+                new_row_df = pd.DataFrame([new_row])
+                times_df = pd.concat(
+                    [
+                        times_df.iloc[: end_index + 1],
+                        new_row_df,
+                        times_df.iloc[end_index + 1 :],
+                    ]
+                ).reset_index(drop=True)
+            else:
+                # Update the existing ACT_EFF (now 'EFF') row with calculated values
+                for year, value in act_eff_values.items():
+                    times_df.at[input_row.name, year] = value
 
             # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes for tra_road
             for attr in ["INPUT", "OUTPUT"]:
@@ -1036,7 +1174,7 @@ def calculate_act_eff(times_df, process_list_file_path):
                 col: "" for col in times_df.columns
             }  # Initialize with empty strings
             new_row["TechName"] = process_name
-            new_row["Attribute"] = "ACT_EFF"
+            new_row["Attribute"] = "EFF"
 
             # Set the values for the years
             for year, value in act_eff_values.items():
@@ -1094,6 +1232,9 @@ process_groups = [
     "tra_rail_frei_1",
     "tra_rail_pass_1",
 ]
+
+# Load the desired units mapping once at the start
+desired_units_mapping = load_desired_units_mapping()
 
 # Define a global list to keep track of processes that have been handled
 handled_processes = []
