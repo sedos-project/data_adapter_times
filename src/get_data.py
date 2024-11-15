@@ -1027,7 +1027,43 @@ def calculate_act_eff(times_df, process_list_file_path):
                 times_df_filtered["Attribute"] == "FLO_SHAR"
             ]
 
-            # Use 'ACT_EFF' as input if no 'INPUT' is found
+            # New condition for processes containing '_hyb_'
+            if "_hyb_" in process_name and not input_rows.empty:
+                act_eff_values_list = (
+                    []
+                )  # List to store act_eff values for each input row
+                for _, input_row in input_rows.iterrows():
+                    act_eff_values = {}
+                    for year in [
+                        "2021",
+                        "2024",
+                        "2027",
+                        "2030",
+                        "2035",
+                        "2040",
+                        "2045",
+                        "2050",
+                        "2060",
+                        "2070",
+                    ]:
+                        try:
+                            input_value = float(input_row[year])
+                            act_eff_values[year] = input_value / 1000000000
+                        except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                            act_eff_values[year] = ""
+                    act_eff_values_list.append(act_eff_values)
+
+                # Replace the input rows' values with CEFF and calculated act_eff values
+                for idx, input_row in enumerate(input_rows.index):
+                    for year, value in act_eff_values_list[idx].items():
+                        times_df.at[input_row, year] = value
+                    times_df.at[input_row, "Attribute"] = (
+                        "CEFF"  # Change Attribute to CEFF
+                    )
+
+                continue  # Skip further processing for '_hyb_' processes
+
+            # Existing 'tra_road' condition for processes without '_hyb_'
             if input_rows.empty and not act_eff_rows.empty and not flo_shar_rows.empty:
                 act_eff_row = act_eff_rows.iloc[0]
                 input_row = act_eff_row
