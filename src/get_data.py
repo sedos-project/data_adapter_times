@@ -637,7 +637,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                         field["unit"] = desired_unit
                                     else:
                                         print(
-                                            f"Desired unit for {source_unit} not found."
+                                            f"Desired unit for {source_unit} for {api_col} not found."
                                         )
                                         converted_value = api_value
                                 else:
@@ -678,7 +678,6 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                     to_unit=desired_unit,
                                                 )
                                             )
-                                            print(converted_value, api_value)
 
                                             if conversion_flag == 1:
                                                 for (
@@ -692,7 +691,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                             field["unit"] = desired_unit
                                         else:
                                             print(
-                                                f"Desired unit for {source_unit} not found."
+                                                f"Desired unit for {source_unit} for {api_col} not found."
                                             )
                                             converted_value = api_value
                                     else:
@@ -866,7 +865,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                                 )
                                             else:
                                                 print(
-                                                    f"Desired unit for {source_unit} not found."
+                                                    f"Desired unit for {source_unit} for {api_col} not found."
                                                 )
                                                 converted_value = api_value
                                         else:

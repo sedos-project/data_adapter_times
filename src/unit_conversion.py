@@ -184,6 +184,7 @@ def define_energy_model_units():
     NamedComposedUnit("percent/vehicle", unit("percent") / unit("vehicle"))
     NamedComposedUnit("percent/kvehicles", unit("percent") / unit("kvehicles"))
 
+    NamedComposedUnit("persons/vehicle", unit("persons") / unit("vehicle"))
     NamedComposedUnit("p/vehicle", unit("p") / unit("vehicle"))
     NamedComposedUnit("kp/vehicle", unit("kp") / unit("vehicle"))
     NamedComposedUnit("Mp/vehicle", unit("Mp") / unit("vehicle"))
@@ -214,6 +215,7 @@ def define_energy_model_units():
     NamedComposedUnit("W/a", unit("W") / unit("a"))
 
     NamedComposedUnit("t/MWh", unit("t") / unit("MWh"))
+    NamedComposedUnit("km/(vehicle*a)", unit("km") / (unit("vehicle") * unit("a")))
 
 
 def get_conversion_factor(convert_from, convert_to):
