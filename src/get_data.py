@@ -735,6 +735,7 @@ def calculate_act_eff(times_df):
     Calculates the ACT_EFF attribute for processes starting with 'ind_autoproducer'.
     Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
     divided by the first INPUT commodity value for each year.
+    Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
 
     Parameters:
     times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
@@ -818,7 +819,7 @@ def calculate_act_eff(times_df):
         # Create a new ACT_EFF row
         new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
         new_row["TechName"] = process_name
-        new_row["Attribute"] = "ACT_EFF"
+        new_row["Attribute"] = "EFF"
 
         # Set the values for the years
         for year, value in act_eff_values.items():
@@ -833,6 +834,14 @@ def calculate_act_eff(times_df):
             ],
             ignore_index=True,
         )
+
+        # Clear the year column values for all INPUT and OUTPUT rows
+        for index in input_rows.index:
+            for year in years_columns:
+                updated_times_df.loc[index, year] = ""
+        for index in output_rows.index:
+            for year in years_columns:
+                updated_times_df.loc[index, year] = ""
 
     return updated_times_df
 
