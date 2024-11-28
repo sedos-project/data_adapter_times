@@ -4,6 +4,10 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
+# Initialize the counter
+fetch_data_counter = 0
+units_mapping = {}
+
 
 def format_and_save_excel(file_path, processed_df):
     """
@@ -16,6 +20,10 @@ def format_and_save_excel(file_path, processed_df):
     Returns:
     str: The path where the Excel file is saved.
     """
+
+    # Replace pd.NA with empty strings
+    processed_df = processed_df.fillna("")
+
     wb = load_workbook(file_path)
     ws = wb.active
 
@@ -167,20 +175,205 @@ def format_and_save_excel(file_path, processed_df):
     return file_path
 
 
+def data_units(metadata):
+    """
+    Converts the units of the fields in the API data according to the metadata.
+
+    Parameters:
+    api_data (pandas.DataFrame): The DataFrame containing the fetched API data.
+    metadata (dict): The metadata containing information about the units.
+
+    Returns:
+    pandas.DataFrame: The DataFrame with units converted to the standard units.
+    """
+    units_dict = {}  # Initialize an empty dictionary to store units
+
+    if not metadata:
+        return units_dict  # Return as is if no data or metadata is present
+
+    for resource in metadata.get("resources", []):
+        fields = resource.get("schema", {}).get("fields", [])
+        for field in fields:
+            field_name = field["name"]
+            field_unit = field.get("unit")
+            if field_name and field_unit:
+                units_dict[field_name] = field_unit  # Store the field_name and unit
+
+    return units_dict
+
+
+def update_commodity_list_units(excel_file_path, units_mapping):
+    """
+    Update the 'Commodity List' sheet in the Excel file with the units from units_mapping.
+    """
+    from openpyxl import load_workbook
+
+    # Load the Excel file
+    wb = load_workbook(excel_file_path)
+    if "Commodity List" in wb.sheetnames:
+        ws = wb["Commodity List"]
+    else:
+        print("Commodity List sheet not found in the Excel file.")
+        return
+
+    # Get header row
+    header_row = None
+    for row in ws.iter_rows(min_row=1, max_row=10, values_only=False):
+        for cell in row:
+            if cell.value == "CommName":
+                header_row = cell.row
+                break
+        if header_row is not None:
+            break
+
+    if header_row is None:
+        print("CommName header not found in Commodity List sheet.")
+        return
+
+    # Get column indices for CommName and Unit
+    headers = {cell.value: cell.column for cell in ws[header_row]}
+    if "CommName" in headers and "Unit" in headers:
+        commname_col = headers["CommName"]
+        unit_col = headers["Unit"]
+    else:
+        print("CommName or Unit column not found in Commodity List sheet.")
+        return
+
+    # For each field_name and field_unit in units_mapping
+    for field_name, field_unit in units_mapping.items():
+        # Only process field names starting with 'conversion_factor_'
+        if field_name.startswith("conversion_factor_"):
+            # Remove the 'conversion_factor_' prefix directly
+            comm_name = field_name[len("conversion_factor_") :]
+            found = False
+            for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
+                commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
+                if commname_cell.value and isinstance(commname_cell.value, str):
+                    if commname_cell.value.strip().lower() == comm_name.strip().lower():
+                        unit_cell = row[unit_col - 1]
+                        unit_cell.value = field_unit
+                        found = True
+                        break  # Assuming CommName is unique
+            if not found:
+                print(
+                    f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
+                )
+
+    # Save the workbook
+    wb.save(excel_file_path)
+    print("Commodity List sheet updated with units.")
+
+
+def update_process_list_sheet(excel_file_path, units_mapping):
+    """
+    Update the 'Process List' sheet in the Excel file with specific values:
+    - Set 'Vintage' to 'NO' for all rows.
+    - Set 'PrimaryCG' to the first output commodity for each process.
+    - Set 'Tact' to the unit of the first output commodity, as found in 'Commodity List' sheet.
+    """
+    # Load the workbook and sheets
+    wb = load_workbook(excel_file_path)
+    if "Process List" not in wb.sheetnames or "Commodity List" not in wb.sheetnames:
+        print("Required sheets not found in the Excel file.")
+        return
+
+    ws_process_list = wb["Process List"]
+    ws_commodity_list = wb["Commodity List"]
+
+    # Identify columns in 'Process List' sheet
+    header_row = find_header_row(ws_process_list, "TechName")
+    headers = {cell.value: cell.column for cell in ws_process_list[header_row]}
+
+    techname_col = headers.get("TechName")
+    vintage_col = headers.get("Vintage")
+    primary_cg_col = headers.get("PrimaryCG")
+    tact_col = headers.get("Tact")
+
+    if not (techname_col and vintage_col and primary_cg_col and tact_col):
+        print("Some required columns are missing in 'Process List' sheet.")
+        return
+
+    # Set Vintage column to 'NO' and populate PrimaryCG and Tact
+    for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
+        techname_cell = row[techname_col - 1]
+        if techname_cell.value:
+            process_name = techname_cell.value.strip()
+
+            # Set Vintage to 'NO'
+            row[vintage_col - 1].value = "NO"
+
+            # Set PrimaryCG to first output commodity and Tact to its unit from Commodity List
+            output_commodity = (
+                updated_df.loc[
+                    (updated_df["TechName"] == process_name)
+                    & (updated_df["Attribute"] == "OUTPUT"),
+                    "Comm-OUT",
+                ]
+                .dropna()
+                .values
+            )
+
+            if output_commodity.size > 0:  # Check if array is not empty
+                primary_cg = output_commodity[0]
+                row[primary_cg_col - 1].value = primary_cg
+
+                # Set Tact to the unit from Commodity List
+                row[tact_col - 1].value = units_mapping.get(
+                    f"conversion_factor_{primary_cg}", "notFound"
+                )
+
+    # Save the workbook
+    wb.save(excel_file_path)
+    print("Process List sheet updated with Vintage, PrimaryCG, and Tact columns.")
+
+
 def fetch_data(url, process_name):
+    global fetch_data_counter
+    fetch_data_counter += 1  # Increment the counter
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            print(f"Data fetched successfully for process: {process_name}")
+            print(
+                f"Data fetched successfully for process {fetch_data_counter}: {process_name}"
+            )
             return pd.DataFrame(response.json())
         else:
             print(
-                f"Failed to fetch data for process: {process_name}, status code: {response.status_code}"
+                f"Failed to fetch data for process {fetch_data_counter}: {process_name}, status code: {response.status_code}"
             )
             return pd.DataFrame()  # Return an empty DataFrame if status code is not 200
     except requests.RequestException as e:
-        print(f"No data found for process: {process_name}, error: {e}")
+        print(
+            f"No data found for process {fetch_data_counter}: {process_name}, error: {e}"
+        )
         return pd.DataFrame()  # Return an empty DataFrame in case of error
+
+
+def fetch_process_metadata(process):
+    """
+    Fetches the metadata of a process and extracts the units for all the resources.
+
+    Parameters:
+    process_name (str): The name of the process to fetch metadata for.
+
+    Returns:
+    dict: A dictionary where the keys are the resource names and the values are their corresponding units.
+    """
+    try:
+        url = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process}/meta/"
+        response = requests.get(url)
+        if response.status_code == 200:
+            metadata = response.json()
+            # print(f"Units fetched successfully for process: {process}")
+            return metadata
+        else:
+            # print(
+            #     f"Failed to fetch metadata for process: {process}, status code: {response.status_code}"
+            # )
+            return {}
+    except requests.RequestException as e:
+        print(f"Error fetching metadata for process: {process}, error: {e}")
+        return {}
 
 
 def find_header_row(sheet, header_name):
@@ -205,31 +398,91 @@ def find_header_row(sheet, header_name):
     raise ValueError("Header row not found within the first 10 rows.")
 
 
-def data_mapping(times_df, process_name):
+def extract_single_value(value):
     """
-    Fetches data from the API for a given process name and updates the times_df DataFrame.
+    Extracts the single integer or float from a list if applicable,
+    otherwise returns the value as is.
+    """
+    if isinstance(value, list) and len(value) == 1:
+        return value[0]
+    return value
+
+
+def data_mapping(times_df, process_name, is_group=False):
+    """
+    Fetches data from the API for a given process name or group and updates the times_df DataFrame.
 
     Parameters:
     times_df (pandas.DataFrame): The DataFrame containing the initial data.
-    process_name (str): The name of the process to fetch and process data for.
+    process_name (str): The name of the process or process group to fetch and process data for.
+    is_group (bool): Flag indicating whether the process_name is a group.
 
     Returns:
     pandas.DataFrame: The updated DataFrame with the new data merged.
     """
-    # Filter for the specific process and keep track of the index range
-    times_df_filtered = times_df[times_df["TechName"] == process_name]
-    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
-    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
+    api_process_data = fetch_data(
+        f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows",
+        process_name,
+    )
 
-    # Fetch data from the API for the specific process
-    API_URL = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{process_name}/rows"
-    api_process_data = fetch_data(API_URL, process_name)
+    # Check if 'version' column exists before filtering
+    if "version" in api_process_data.columns:
+        api_process_data = api_process_data[
+            api_process_data["version"] == "srd_point_draft"
+        ]
+    else:
+        print(f"'version' column not found in the {process_name} process data.")
 
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
 
+    if is_group:
+        # Divide the data based on the 'type' column
+        process_groups = api_process_data.groupby("type")
+
+        process_count = 0  # Initialize a counter for the processes handled
+
+        for process, group_data in process_groups:
+            if process.endswith("_ag"):  # Skip processes ending with _ag
+                continue
+
+            # Remove columns where all values are NaN (i.e., columns without any data)
+            group_data = group_data.dropna(axis=1, how="all")
+
+            handled_processes.append(process)
+            times_df = data_mapping_internal(
+                times_df, process, group_data
+            )  # Call internal function for each process
+            process_count += 1  # Increment the counter for each handled process
+
+        print(
+            f"{process_count} processes were handled inside the process group: {process_name}"
+        )
+        return times_df
+    else:
+        return data_mapping_internal(times_df, process_name, api_process_data)
+
+
+def data_mapping_internal(times_df, process_name, api_process_data):
+
+    # Fetch metadata
+    metadata = fetch_process_metadata(process_name)
+
+    # Update units_mapping
+    global units_mapping
+    units_mapping.update(data_units(metadata))
+
+    # Filter for the specific process and keep track of the index range
+    times_df_filtered = times_df[times_df["TechName"] == process_name]
+    if times_df_filtered.empty:
+        print(f"{process_name} was not found in the input and hence was skipped")
+        return times_df  # Skip if there is no matching process
+
+    start_idx = times_df.index.get_loc(times_df_filtered.index[0])
+    end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
+
     # Load the mapping file
-    mapping_file_path = "mapping_v2.xlsx"
+    mapping_file_path = "config_data/mapping_v3.xlsx"
     wb = load_workbook(mapping_file_path, data_only=True)
     sheet = wb["SEDOS_parameters"]
 
@@ -275,8 +528,6 @@ def data_mapping(times_df, process_name):
         for sedos_item, api_cols in matched_columns.items()
     }
 
-    # print("Extended Matched Columns:", extended_matched_columns)
-
     # Update the times_df_filtered with the api_process_data based on the matched columns
     for sedos_item, (
         api_cols,
@@ -284,7 +535,6 @@ def data_mapping(times_df, process_name):
         constraint,
     ) in extended_matched_columns.items():
         for api_col in api_cols:
-            # print(sedos_item, api_col, times_col)
             if api_col in api_process_data.columns:
                 # Extract the values and year from the API data
                 api_values = api_process_data[api_col]
@@ -292,6 +542,7 @@ def data_mapping(times_df, process_name):
                 comm_col_value = api_col.replace("conversion_factor_", "")
 
                 for api_value, year in zip(api_values, years):
+                    api_value = extract_single_value(api_value)
                     # Find the column in times_df_filtered that matches the year
                     if str(year) in times_df_filtered.columns:
                         # Check if sedos_item contains 'conversion_factor_'
@@ -301,7 +552,7 @@ def data_mapping(times_df, process_name):
                                 (
                                     (times_df_filtered["Attribute"] == times_col)
                                     | (times_df_filtered["Attribute"] == "OUTPUT")
-                                    | (times_df_filtered["Attribute"] == "ACT_EFF")
+                                    | (times_df_filtered["Attribute"] == "INPUT")
                                 )
                                 & (
                                     (times_df_filtered["Comm-IN"] == comm_col_value)
@@ -310,16 +561,18 @@ def data_mapping(times_df, process_name):
                             ]
                             if not matching_row.empty:
                                 for idx in matching_row.index:
-                                    times_df_filtered.at[idx, str(year)] = api_value
+                                    if api_value is not None:
+                                        times_df_filtered.at[idx, str(year)] = api_value
                             else:
                                 matching_row = times_df_filtered[
                                     (times_df_filtered["Attribute"] == "ACT_EFF")
                                 ]
                                 if not matching_row.empty:
                                     for idx in matching_row.index:
-                                        times_df_filtered.at[idx, str(year)] = (
-                                            1 / api_value
-                                        )
+                                        if api_value is not None:
+                                            times_df_filtered.at[idx, str(year)] = (
+                                                1 / api_value
+                                            )
                         elif "flow_share" in sedos_item:
                             # Add flow share values
                             matching_row = times_df_filtered[
@@ -348,11 +601,14 @@ def data_mapping(times_df, process_name):
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
                                     if flow_share_commodity in (comm_in, comm_out):
-                                        times_df_filtered.at[idx, str(year)] = api_value
-                                        times_df_filtered.at[idx, "LimType"] = (
-                                            constraint
-                                        )
-                                        sum_of_matched_values += api_value
+                                        if api_value is not None:
+                                            times_df_filtered.at[idx, str(year)] = (
+                                                api_value / 100
+                                            )
+                                            times_df_filtered.at[idx, "LimType"] = (
+                                                constraint
+                                            )
+                                            sum_of_matched_values += api_value / 100
 
                                 # Handle the rows that do not match the flow share commodity
                                 for idx in matching_row.index:
@@ -361,7 +617,43 @@ def data_mapping(times_df, process_name):
                                         times_df_filtered.at[idx, "Comm-OUT"],
                                     ):
                                         times_df_filtered.at[idx, str(year)] = (
-                                            100 - sum_of_matched_values
+                                            1 - sum_of_matched_values
+                                        )
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
+                        elif (
+                            "availability_constant" in sedos_item
+                            or "availability_timeseries_fixed" in sedos_item
+                        ):
+                            # Handle availability constants or time series fixed
+                            matching_row = times_df_filtered[
+                                times_df_filtered["Attribute"] == times_col
+                            ]
+                            if matching_row.empty:
+                                # Add a new row if the Attribute does not exist
+                                new_row = pd.Series(
+                                    {col: pd.NA for col in times_df_filtered.columns}
+                                )
+                                new_row["TechName"] = process_name
+                                new_row["Attribute"] = times_col
+                                new_row["LimType"] = constraint
+                                times_df_filtered = pd.concat(
+                                    [times_df_filtered, new_row.to_frame().T],
+                                    ignore_index=True,
+                                )
+                                new_row_idx = times_df_filtered[
+                                    times_df_filtered["Attribute"] == times_col
+                                ].index[-1]
+                                if api_value is not None:
+                                    times_df_filtered.at[new_row_idx, str(year)] = (
+                                        api_value / 100
+                                    )
+                            else:
+                                for idx in matching_row.index:
+                                    if api_value is not None:
+                                        times_df_filtered.at[idx, str(year)] = (
+                                            api_value / 100
                                         )
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
@@ -386,13 +678,58 @@ def data_mapping(times_df, process_name):
                                 new_row_idx = times_df_filtered[
                                     times_df_filtered["Attribute"] == times_col
                                 ].index[-1]
-                                times_df_filtered.at[new_row_idx, str(year)] = api_value
+                                if api_value is not None:
+                                    # If the sedos_item contains 'cb_coefficient', apply 1/api_value
+                                    if "cb_coefficient" in sedos_item:
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            1 / api_value
+                                        )
+                                    else:
+                                        # For all other cases, just use the api_value directly
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            api_value
+                                        )
                             else:
                                 for idx in matching_row.index:
-                                    times_df_filtered.at[idx, str(year)] = api_value
-                                    times_df_filtered.at[idx, "LimType"] = constraint
+                                    if api_value is not None:
+                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
 
-    # print(times_df_filtered)
+    # Implement CAP2ACT logic
+    cap2act_value = 1  # Default to empty if no match is found
+
+    if process_name.endswith("_1"):
+        # Check if 'cost_inv_p' exists in the API process data columns
+        if "cost_inv_p" in api_process_data.columns:
+            cap2act_value = 31.536
+    elif process_name.endswith("_0"):
+        # Check if 'capacity_p_inst_0' exists in the API process data columns
+        if "capacity_p_inst_0" in api_process_data.columns:
+            cap2act_value = 31.536
+
+    # Add CAP2ACT as a new row in times_df_filtered
+    cap2act_row = pd.Series(
+        {
+            "TechName": process_name,
+            "Attribute": "CAP2ACT",
+            "LimType": pd.NA,
+            "2021": cap2act_value,
+            "2024": cap2act_value,
+            "2027": cap2act_value,
+            "2030": cap2act_value,
+            "2035": cap2act_value,
+            "2040": cap2act_value,
+            "2045": cap2act_value,
+            "2050": cap2act_value,
+            "2060": cap2act_value,
+            "2070": cap2act_value,
+        }
+    )
+    times_df_filtered = pd.concat(
+        [times_df_filtered, cap2act_row.to_frame().T], ignore_index=True
+    )
 
     # Replace <NA> with empty strings before updating the original times_df
     with pd.option_context("future.no_silent_downcasting", True):
@@ -412,25 +749,161 @@ def data_mapping(times_df, process_name):
     return times_df
 
 
+def calculate_act_eff(times_df):
+    """
+    Calculates the ACT_EFF attribute for processes starting with 'ind_autoproducer'.
+    Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
+    divided by the first INPUT commodity value for each year.
+    Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
+
+    Parameters:
+    times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
+
+    Returns:
+    pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
+    """
+    # Filter processes that start with 'ind_autoproducer'
+    ind_autoproducer_processes = times_df[
+        times_df["TechName"].str.startswith("ind_autoproducer")
+    ]
+
+    if ind_autoproducer_processes.empty:
+        print("No processes starting with 'ind_autoproducer' found.")
+        return times_df
+
+    # Create a copy of the DataFrame to work with
+    updated_times_df = times_df.copy()
+
+    # Collect process positions
+    process_positions = []
+    for process_name in ind_autoproducer_processes["TechName"].unique():
+        # Filter rows for this process
+        times_df_filtered = times_df[times_df["TechName"] == process_name]
+
+        if times_df_filtered.empty:
+            print(f"{process_name} was not found in times_df and hence was skipped")
+            continue
+
+        # Get the index range for this process
+        process_indices = times_df_filtered.index
+        start_index = process_indices[0]
+        end_index = process_indices[-1]
+
+        # Add the process position to the list
+        process_positions.append((start_index, end_index, process_name))
+
+    # Sort process_positions in descending order to avoid index shift issues during insertion
+    process_positions.sort(reverse=True)
+
+    # Iterate over processes and calculate ACT_EFF
+    for start_index, end_index, process_name in process_positions:
+        # Filter rows for the current process
+        times_df_filtered = updated_times_df.iloc[start_index : end_index + 1]
+
+        # Find the first INPUT and OUTPUT rows
+        input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
+        output_rows = times_df_filtered[times_df_filtered["Attribute"] == "OUTPUT"]
+
+        if input_rows.empty or output_rows.empty:
+            print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
+            continue
+
+        # Take the first INPUT and OUTPUT rows
+        input_row = input_rows.iloc[0]
+        output_row = output_rows.iloc[0]
+
+        # Calculate ACT_EFF for each year
+        act_eff_values = {}
+        years_columns = [
+            "2021",
+            "2024",
+            "2027",
+            "2030",
+            "2035",
+            "2040",
+            "2045",
+            "2050",
+            "2060",
+            "2070",
+        ]
+        for year in years_columns:
+            try:
+                input_value = float(input_row[year])
+                output_value = float(output_row[year])
+                act_eff = output_value / input_value if input_value else ""
+                act_eff_values[year] = act_eff
+            except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                act_eff_values[year] = ""
+
+        # Create a new ACT_EFF row
+        new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
+        new_row["TechName"] = process_name
+        new_row["Attribute"] = "EFF"
+
+        # Set the values for the years
+        for year, value in act_eff_values.items():
+            new_row[year] = value
+
+        # Insert the new row after the current process's rows
+        updated_times_df = pd.concat(
+            [
+                updated_times_df.iloc[: end_index + 1],  # Rows up to the process
+                pd.DataFrame([new_row]),  # The new ACT_EFF row
+                updated_times_df.iloc[end_index + 1 :],  # Rows after the process
+            ],
+            ignore_index=True,
+        )
+
+        # Clear the year column values for all INPUT and OUTPUT rows
+        for index in input_rows.index:
+            for year in years_columns:
+                updated_times_df.loc[index, year] = ""
+        for index in output_rows.index:
+            for year in years_columns:
+                updated_times_df.loc[index, year] = ""
+
+    return updated_times_df
+
+
 # Paths and URLs
-TIMES_FILE_PATH = "test_output_x2x.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_x2x.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "times_df_x2x.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_x2x.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
-# format_and_save_excel("test_output_cmp.xlsx", times_df)
 
 # Create a copy of times_df to work with
 updated_df = times_df.copy()
 
-# Fetch and process data for each unique process in the TechName column that starts with 'ind'
+# Pre-defined process groups to handle
+process_groups = [
+    # Add other process groups here if needed
+]
+
+# Define a global list to keep track of processes that have been handled
+handled_processes = []
+
+# Handle pre-defined process groups first
+for process_group in process_groups:
+    updated_df = data_mapping(updated_df, process_group, is_group=True)
+
+# Fetch and process data for each unique process in the TechName column that starts with 'x2x'
 unique_processes = times_df["TechName"].unique()
 x2x_processes = [process for process in unique_processes if process.startswith("x2x")]
 
-for process in x2x_processes:
-    updated_df = data_mapping(
-        updated_df, process
-    )  # Perform data mapping and update updated_df
+# Skip processes that end with '_ag'
+x2x_processes = [process for process in x2x_processes if not process.endswith("_ag")]
 
+for process in x2x_processes:
+    if process not in handled_processes:
+        updated_df = data_mapping(
+            updated_df, process
+        )  # Perform data mapping and update updated_df
+
+# Apply ACT_EFF calculation
+updated_df = calculate_act_eff(updated_df)
+# Save the updated DataFrame
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
+update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
+update_process_list_sheet(TIMES_FILE_PATH, units_mapping)
 print("Excel file saved")
