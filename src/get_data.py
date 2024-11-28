@@ -319,7 +319,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = units_mapping.get(
-                    f"conversion_factor_{primary_cg}", ""
+                    f"conversion_factor_{primary_cg}", "notFound"
                 )
 
     # Save the workbook
