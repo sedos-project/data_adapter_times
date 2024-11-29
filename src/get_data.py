@@ -232,11 +232,12 @@ def update_commodity_list_units(excel_file_path, units_mapping):
 
     # Get column indices for CommName and Unit
     headers = {cell.value: cell.column for cell in ws[header_row]}
-    if "CommName" in headers and "Unit" in headers:
+    if "CommName" in headers and "Unit" in headers and "Ctype" in headers:
         commname_col = headers["CommName"]
         unit_col = headers["Unit"]
+        ctype_col = headers["Ctype"]
     else:
-        print("CommName or Unit column not found in Commodity List sheet.")
+        print("CommName or Unit or Ctype column not found in Commodity List sheet.")
         return
 
     # For each field_name and field_unit in units_mapping
@@ -249,6 +250,16 @@ def update_commodity_list_units(excel_file_path, units_mapping):
             for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
                 commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
                 if commname_cell.value and isinstance(commname_cell.value, str):
+                    commname = commname_cell.value.strip().lower()
+                    # Check if "_elec_" or other boundary conditions exist
+                    if (
+                        "_elec_" in commname
+                        or commname.startswith("elec_")
+                        or commname.endswith("_elec")
+                        or commname == "elec"
+                    ):
+                        ctype_cell = row[ctype_col - 1]
+                        ctype_cell.value = "ELC"
                     if commname_cell.value.strip().lower() == comm_name.strip().lower():
                         unit_cell = row[unit_col - 1]
                         unit_cell.value = field_unit
@@ -314,7 +325,10 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             )
 
             if output_commodity.size > 0:  # Check if array is not empty
-                primary_cg = output_commodity[0]
+                if "_autoproducer_" in process_name:
+                    primary_cg = "NRGO"
+                else:
+                    primary_cg = output_commodity[0]
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
@@ -464,7 +478,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
 
     # Load the mapping file
-    mapping_file_path = "config_data/mapping_v3.xlsx"
+    mapping_file_path = "config_data/mapping_v4.xlsx"
     wb = load_workbook(mapping_file_path, data_only=True)
     sheet = wb["SEDOS_parameters"]
 
@@ -673,7 +687,16 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                             else:
                                 for idx in matching_row.index:
                                     if api_value is not None:
-                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        # If the sedos_item contains 'cb_coefficient', apply 1/api_value
+                                        if "cb_coefficient" in sedos_item:
+                                            times_df_filtered.at[
+                                                new_row_idx, str(year)
+                                            ] = (1 / api_value)
+                                        else:
+                                            # For all other cases, just use the api_value directly
+                                            times_df_filtered.at[
+                                                new_row_idx, str(year)
+                                            ] = api_value
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
