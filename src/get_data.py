@@ -889,7 +889,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
         for comm_out in times_df_filtered["Comm-OUT"]
     ):
         cap2act_value = (
-            0.001  # Set CAP2ACT to 0.001 if "exo_" is in any output commodity
+            0.000000001  # Set CAP2ACT to 0.001 if "exo_" is in any output commodity
         )
 
     # Check if the process name contains "battery"
