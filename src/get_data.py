@@ -753,7 +753,6 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         )
                         elif (
                             "availability_constant" in sedos_item
-                            or "availability_timeseries_fixed" in sedos_item
                             or "efficiency_sto_in" in sedos_item
                         ):
                             # Handle availability constants or time series fixed
@@ -788,6 +787,12 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
+                        elif (
+                            "availability_timeseries_fixed" in sedos_item
+                            or "availability_timeseries_max" in sedos_item
+                        ):
+                            # temporary fix
+                            continue
                         else:
                             # Check if only the Attribute matches
                             matching_row = times_df_filtered[
