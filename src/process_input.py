@@ -257,8 +257,8 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Load the commodity_set data from mapping_v3.xlsx
-    wb_mapping = load_workbook("config_data/mapping_v3.xlsx", data_only=True)
+    # Load the commodity_set data from mapping_v4.xlsx
+    wb_mapping = load_workbook("config_data/mapping_v4.xlsx", data_only=True)
     ws_mapping = wb_mapping["commodity_set"]
 
     # Find the header row dynamically
