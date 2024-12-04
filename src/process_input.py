@@ -257,8 +257,8 @@ def add_comm_sheet_to_workbook(file_path, processed_df):
         cell.border = thin_border
         cell.alignment = align_center
 
-    # Load the commodity_set data from mapping_v3.xlsx
-    wb_mapping = load_workbook("config_data/mapping_v3.xlsx", data_only=True)
+    # Load the commodity_set data from mapping_v4.xlsx
+    wb_mapping = load_workbook("config_data/mapping_v4.xlsx", data_only=True)
     ws_mapping = wb_mapping["commodity_set"]
 
     # Find the header row dynamically
@@ -405,8 +405,10 @@ def add_process_sheet_to_workbook(file_path, processed_df):
     for _, row in processed_df.iterrows():
         tech_name = row["TechName"]
         output_commodities = row["Comm-OUT"]
-        if "_chp_" in tech_name.lower() or "_autoproducer_" in tech_name.lower():
-            process_sets[tech_name] = "CHP"
+        if "import" in tech_name.lower():
+            process_sets[tech_name] = "IMP"
+        elif "storage" in tech_name.lower():
+            process_sets[tech_name] = "STS"
         elif pd.notna(output_commodities) and "exo_" in output_commodities.lower():
             process_sets[tech_name] = "DEM"
         else:

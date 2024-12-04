@@ -354,26 +354,26 @@ def main():
     start_row = header_row + 1  # Initialize start_row after clearing
 
     # Pre-defined process groups to handle
-    process_groups = ["exo_other_ind"]  # Add more process groups as needed
+    process_groups = [""]  # Add more process groups as needed
 
     # Handle predefined process groups
     for process_group in process_groups:
         process_group_or_individual(process_group, ws, is_group=True)
 
-    # Fetch and process data for individual processes (e.g., starting with 'ind')
+    # Fetch and process data for individual processes (e.g., starting with 'x2x')
     # Assuming times_df is pre-loaded or fetched from your initial pickle or Excel file
-    times_df = pd.read_pickle("output_data/times_df_ind.pkl")
+    times_df = pd.read_pickle("output_data/times_df_x2x.pkl")
     unique_processes = times_df["TechName"].unique()
-    ind_processes = [
-        process for process in unique_processes if process.startswith("ind")
+    x2x_processes = [
+        process for process in unique_processes if process.startswith("x2x")
     ]
 
     # Skip processes that end with '_ag'
-    ind_processes = [
-        process for process in ind_processes if not process.endswith("_ag")
+    x2x_processes = [
+        process for process in x2x_processes if not process.endswith("_ag")
     ]
 
-    for process in ind_processes:
+    for process in x2x_processes:
         process_group_or_individual(process, ws)
 
     # Save the workbook after making updates

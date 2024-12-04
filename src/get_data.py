@@ -314,13 +314,27 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             )
 
             if output_commodity.size > 0:  # Check if array is not empty
-                primary_cg = output_commodity[0]
-                row[primary_cg_col - 1].value = primary_cg
+                if (
+                    "_oref_" in process_name
+                    or "_x2liquid_ft_" in process_name
+                    or "_biogas_treatment" in process_name
+                    or "_aec_" in process_name
+                    or "_pemec_" in process_name
+                    or "_soec_" in process_name
+                    or "_coel_" in process_name
+                ):
+                    primary_cg = "NRGI"
+                else:
+                    primary_cg = output_commodity[0]
 
+                row[primary_cg_col - 1].value = primary_cg
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = units_mapping.get(
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
+            else:
+                # Set Tact to the unit from Commodity List
+                row[tact_col - 1].value = "notFound"
 
     # Save the workbook
     wb.save(excel_file_path)
@@ -482,7 +496,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     end_idx = times_df.index.get_loc(times_df_filtered.index[-1])
 
     # Load the mapping file
-    mapping_file_path = "config_data/mapping_v3.xlsx"
+    mapping_file_path = "config_data/mapping_v4.xlsx"
     wb = load_workbook(mapping_file_path, data_only=True)
     sheet = wb["SEDOS_parameters"]
 
@@ -625,6 +639,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                         elif (
                             "availability_constant" in sedos_item
                             or "availability_timeseries_fixed" in sedos_item
+                            or "efficiency_sto_in" in sedos_item
                         ):
                             # Handle availability constants or time series fixed
                             matching_row = times_df_filtered[
@@ -751,7 +766,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
 
 def calculate_act_eff(times_df):
     """
-    Calculates the ACT_EFF attribute for processes starting with 'ind_autoproducer'.
+    Calculates the ACT_EFF attribute for processes.
     Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
     divided by the first INPUT commodity value for each year.
     Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
