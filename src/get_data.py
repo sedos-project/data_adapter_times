@@ -664,9 +664,20 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 ].index[-1]
                                 if api_value is not None:
                                     # If the sedos_item contains 'cb_coefficient', apply 1/api_value
-                                    if "cb_coefficient" in sedos_item:
+                                    if (
+                                        "cb_coefficient" in sedos_item
+                                        and api_value != 0
+                                    ):
                                         times_df_filtered.at[new_row_idx, str(year)] = (
                                             1 / api_value
+                                        )
+                                    elif (
+                                        "cb_coefficient" in sedos_item
+                                        and api_value == 0
+                                    ):
+                                        # For zero division error cases, just use ERR
+                                        times_df_filtered.at[new_row_idx, str(year)] = (
+                                            "ERR"
                                         )
                                     else:
                                         # For all other cases, just use the api_value directly
@@ -677,15 +688,24 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 for idx in matching_row.index:
                                     if api_value is not None:
                                         # If the sedos_item contains 'cb_coefficient', apply 1/api_value
-                                        if "cb_coefficient" in sedos_item:
-                                            times_df_filtered.at[
-                                                new_row_idx, str(year)
-                                            ] = (1 / api_value)
+                                        if (
+                                            "cb_coefficient" in sedos_item
+                                            and api_value != 0
+                                        ):
+                                            times_df_filtered.at[idx, str(year)] = (
+                                                1 / api_value
+                                            )
+                                        elif (
+                                            "cb_coefficient" in sedos_item
+                                            and api_value == 0
+                                        ):
+                                            # For zero division error cases, just use ERR
+                                            times_df_filtered.at[idx, str(year)] = "ERR"
                                         else:
                                             # For all other cases, just use the api_value directly
-                                            times_df_filtered.at[
-                                                new_row_idx, str(year)
-                                            ] = api_value
+                                            times_df_filtered.at[idx, str(year)] = (
+                                                api_value
+                                            )
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
@@ -859,10 +879,10 @@ def calculate_act_eff(times_df):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "output_data/vt_DE_hea.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_pow.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "output_data/times_df_hea.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_pow.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
 
 # Create a copy of times_df to work with
@@ -870,37 +890,124 @@ updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
 process_groups = [
-    "hea_hh_me1_existing_technologies",
-    "hea_hh_me2_existing_technologies",
-    "hea_hh_me3_existing_technologies",
-    "hea_scalar",
-    "hea_hh_re1_existing_technologies",
-    "hea_hh_re2_existing_technologies",
-    "hea_hh_re3_existing_technologies",
-    "hea_demand",
-    "hea_hh_ue1_new_technologies",
-    "hea_hh_ue2_new_technologies",
-    "hea_hh_ue3_new_technologies",
-    "hea_hh_un1_new_technologies",
-    "hea_hh_me1_new_technologies",
-    "hea_hh_me2_new_technologies",
-    "hea_hh_me3_new_technologies",
-    "hea_hh_mn1_new_technologies",
-    "hea_hh_ue1_existing_technologies",
-    "hea_hh_ue2_existing_technologies",
-    "hea_hh_ue3_existing_technologies",
-    "hea_hh_re1_new_technologies",
-    "hea_hh_re2_new_technologies",
-    "hea_hh_re3_new_technologies",
-    "hea_hh_rn1_new_technologies",
-    "hea_cts_t1e_new_technologies",
-    "hea_cts_t1n_new_technologies",
-    "hea_cts_t2e_new_technologies",
-    "hea_cts_t2n_new_technologies",
-    "hea_cts_t1e_existing_technologies",
-    "hea_cts_t2e_existing_technologies",
+    "pow_combustion_cc_biogas_1",
+    "pow_combustion_cc_biomass_1",
+    "pow_combustion_cc_biomass_2",
+    "pow_combustion_cc_chp_biomass_1",
+    "pow_combustion_cc_chp_ccs_methane_1",
+    "pow_combustion_cc_chp_coal_1",
+    "pow_combustion_cc_chp_hydrogen_1",
+    "pow_combustion_cc_chp_lignite_1",
+    "pow_combustion_cc_chp_methane_1",
+    "pow_combustion_cc_chp_methane_2",
+    "pow_combustion_cc_chp_oil_1",
+    "pow_combustion_cc_chp_syngas_1",
+    "pow_combustion_cc_lignite_1",
+    "pow_combustion_cc_methane_1",
+    "pow_combustion_cc_methane_2",
+    "pow_combustion_cc_methane_3",
+    "pow_combustion_cc_oil_1",
+    "pow_combustion_cc_oil_2",
+    "pow_combustion_cc_oil_3",
+    "pow_combustion_cc_waste_1",
+    "pow_combustion_cc_waste_2",
+    "pow_combustion_fc_biogas_1",
+    "pow_combustion_fc_biogas_2",
+    "pow_combustion_fc_syngas_1",
+    "pow_combustion_fc_syngas_2",
+    "pow_combustion_fc_syngas_3",
+    "pow_combustion_gt_biogas_1",
+    "pow_combustion_gt_biogas_2",
+    "pow_combustion_gt_biogas_3",
+    "pow_combustion_gt_biogas_4",
+    "pow_combustion_gt_chp_biogas_1",
+    "pow_combustion_gt_chp_biogas_2",
+    "pow_combustion_gt_chp_biomass_1",
+    "pow_combustion_gt_chp_biomass_2",
+    "pow_combustion_gt_chp_biomass_3",
+    "pow_combustion_gt_chp_ccs_methane_1",
+    "pow_combustion_gt_chp_oil_1",
+    "pow_combustion_gt_chp_oil_2",
+    "pow_combustion_gt_chp_syngas_1",
+    "pow_combustion_gt_chp_syngas_2",
+    "pow_combustion_gt_hydrogen_1",
+    "pow_combustion_gt_methane_1",
+    "pow_combustion_gt_oil_1",
+    "pow_combustion_gt_oil_2",
+    "pow_combustion_gt_syngas_1",
+    "pow_combustion_ic_biogas_1",
+    "pow_combustion_ic_biogas_2",
+    "pow_combustion_ic_ccs_biogas_1",
+    "pow_combustion_ic_chp_biogas_1",
+    "pow_combustion_ic_chp_biogas_2",
+    "pow_combustion_ic_chp_biogas_3",
+    "pow_combustion_ic_chp_biogas_4",
+    "pow_combustion_ic_chp_biogas_5",
+    "pow_combustion_ic_chp_ccs_biogas_1",
+    "pow_combustion_ic_chp_ccs_methane_1",
+    "pow_combustion_ic_chp_methane_1",
+    "pow_combustion_ic_chp_oil_1",
+    "pow_combustion_ic_chp_oil_2",
+    "pow_combustion_ic_chp_syngas_1",
+    "pow_combustion_ic_chp_syngas_2",
+    "pow_combustion_ic_chp_syngas_3",
+    "pow_combustion_ic_diesel_1",
+    "pow_combustion_ic_methane_1",
+    "pow_combustion_ic_oil_1",
+    "pow_combustion_ic_oil_2",
+    "pow_combustion_ic_oil_3",
+    "pow_combustion_ic_syngas_1",
+    "pow_combustion_ic_syngas_2",
+    "pow_combustion_ic_syngas_3",
+    "pow_combustion_ic_syngas_4",
+    "pow_combustion_ic_syngas_5",
+    "pow_combustion_ic_syngas_6",
+    "pow_combustion_st_biogas_1",
+    "pow_combustion_st_biomass_1",
+    "pow_combustion_st_biomass_2",
+    "pow_combustion_st_biomass_3",
+    "pow_combustion_st_biomass_4",
+    "pow_combustion_st_biomass_5",
+    "pow_combustion_st_ccs_biomass_1",
+    "pow_combustion_st_ccs_coal_1",
+    "pow_combustion_st_ccs_lignite_1",
+    "pow_combustion_st_chp_biogas_1",
+    "pow_combustion_st_chp_biomass_1",
+    "pow_combustion_st_chp_biomass_2",
+    "pow_combustion_st_chp_biomass_3",
+    "pow_combustion_st_chp_biomass_4",
+    "pow_combustion_st_chp_biomass_5",
+    "pow_combustion_st_chp_biomass_6",
+    "pow_combustion_st_chp_biomass_7",
+    "pow_combustion_st_chp_biomass_8",
+    "pow_combustion_st_chp_biomass_9",
+    "pow_combustion_st_chp_ccs_biomass_1",
+    "pow_combustion_st_chp_ccs_biomass_2",
+    "pow_combustion_st_chp_ccs_biomass_3",
+    "pow_combustion_st_chp_ccs_biomass_4",
+    "pow_combustion_st_chp_ccs_waste_1",
+    "pow_combustion_st_chp_oil_1",
+    "pow_combustion_st_chp_syngas_1",
+    "pow_combustion_st_chp_waste_1",
+    "pow_combustion_st_chp_waste_2",
+    "pow_combustion_st_chp_waste_3",
+    "pow_combustion_st_chp_waste_4",
+    "pow_combustion_st_coal_1",
+    "pow_combustion_st_coal_2",
+    "pow_combustion_st_oil_1",
+    "pow_combustion_st_syngas_1",
+    "pow_combustion_st_waste_1",
+    "pow_combustion_st_waste_2",
+    "pow_combustion_st_waste_3",
+    "pow_demand",
+    "pow_geothermal_orc_1",
+    "pow_geothermal_st_chp_1",
+    "pow_helper",
+    "pow_marine_1",
+    "pow_nuclear_fis_1",
+    "pow_scalars",
+    "pow_source_nonbio",
 ]
-
 
 # Define a global list to keep track of processes that have been handled
 handled_processes = []
@@ -909,14 +1016,14 @@ handled_processes = []
 for process_group in process_groups:
     updated_df = data_mapping(updated_df, process_group, is_group=True)
 
-# Fetch and process data for each unique process in the TechName column that starts with 'hea'
+# Fetch and process data for each unique process in the TechName column that contain 'pow_'
 unique_processes = times_df["TechName"].unique()
-hea_processes = [process for process in unique_processes if process.startswith("hea")]
+pow_processes = [process for process in unique_processes if "pow_" in process.lower()]
 
 # Skip processes that end with '_ag'
-hea_processes = [process for process in hea_processes if not process.endswith("_ag")]
+pow_processes = [process for process in pow_processes if not process.endswith("_ag")]
 
-for process in hea_processes:
+for process in pow_processes:
     if process not in handled_processes:
         updated_df = data_mapping(
             updated_df, process
