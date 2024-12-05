@@ -328,11 +328,24 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = output_commodity[0]
 
                 row[primary_cg_col - 1].value = primary_cg
+
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = units_mapping.get(
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
             else:
+                if (
+                    "_oref_" in process_name
+                    or "_x2liquid_ft_" in process_name
+                    or "_biogas_treatment" in process_name
+                    or "_aec_" in process_name
+                    or "_pemec_" in process_name
+                    or "_soec_" in process_name
+                    or "_coel_" in process_name
+                ):
+                    primary_cg = "NRGI"
+                    row[primary_cg_col - 1].value = primary_cg
+
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = "notFound"
 
