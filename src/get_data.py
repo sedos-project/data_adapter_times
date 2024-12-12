@@ -1250,6 +1250,197 @@ def calculate_act_eff(times_df, process_list_file_path):
     return times_df
 
 
+def extract_and_save_actflo_demo_data(
+    times_df, output_file_path="tra_occupancy.xlsx", sheet_name="INS"
+):
+    """
+    Extracts rows from times_df where Attribute == 'ACTFLO~DEMO', transforms them, and writes them
+    into another Excel file in the specified sheet in the desired format.
+
+    The final format in the sheet is expected to have the following columns:
+    TimeSlice | LimType | Attribute | Year | Other_Indexes | DE | Pset_PN | Pset_Set | Pset_PD | Pset_CI | Pset_CO | Cset_Set | Cset_CN | Cset_CD | Attrib_Cond | Val_Cond
+
+    Example of desired format (based on the user-provided snippet):
+
+    Trans - Insert
+        ~TFM_INS
+        TimeSlice   LimType Attribute Year Other_Indexes DE       Pset_PN                Pset_Set Pset_PD Pset_CI Pset_CO Cset_Set Cset_CN Cset_CD Attrib_Cond Val_Cond
+                    ACTFLO  2021     DEMO 8,2          tra_road_bus_bev_pass_short_0
+                    ACTFLO  2024     DEMO 9            tra_road_bus_bev_pass_short_0
+                    ACTFLO  2027     DEMO              tra_road_bus_bev_pass_short_0
+
+    In this example:
+    - Attribute is always 'ACTFLO'
+    - Other_Indexes is always 'DEMO'
+    - Pset_PN is the process (TechName)
+    - DE and Year values come from the times_df row where Attribute was 'ACTFLO~DEMO'
+    - The rest columns can be left blank as per the provided snippet.
+    """
+
+    from openpyxl import load_workbook
+
+    # Identify all processes that have at least one 'ACTFLO~DEMO' row
+    processes_with_demo = times_df.loc[
+        times_df["Attribute"] == "ACTFLO~DEMO", "TechName"
+    ].unique()
+
+    # If no processes found, just return
+    if len(processes_with_demo) == 0:
+        return
+
+    # Prepare a DataFrame to hold transformed data
+    transformed_columns = [
+        "TimeSlice",
+        "LimType",
+        "Attribute",
+        "Year",
+        "Other_Indexes",
+        "DE",
+        "Pset_PN",
+        "Pset_Set",
+        "Pset_PD",
+        "Pset_CI",
+        "Pset_CO",
+        "Cset_Set",
+        "Cset_CN",
+        "Cset_CD",
+        "Attrib_Cond",
+        "Val_Cond",
+    ]
+    transformed_df = pd.DataFrame(columns=transformed_columns)
+
+    # Define the years to consider
+    years = [
+        "2021",
+        "2024",
+        "2027",
+        "2030",
+        "2035",
+        "2040",
+        "2045",
+        "2050",
+        "2060",
+        "2070",
+    ]
+
+    # For each process, extract ACTFLO~DEMO rows and transform
+    for process in processes_with_demo:
+        subset = times_df[
+            (times_df["TechName"] == process) & (times_df["Attribute"] == "ACTFLO~DEMO")
+        ]
+        # There could be multiple rows for the same process with ACTFLO~DEMO
+        for _, row in subset.iterrows():
+            # For each year that has a value
+            for yr in years:
+                if yr in row and row[yr] != "" and pd.notna(row[yr]):
+                    # Create a new transformed row
+                    new_row = {
+                        "TimeSlice": "",  # Blank as per the snippet
+                        "LimType": "",  # Blank as per the snippet
+                        "Attribute": "ACTFLO",
+                        "Year": yr,
+                        "Other_Indexes": "DEMO",
+                        "DE": row[yr],  # Yearly data from the ACTFLO~DEMO row
+                        "Pset_PN": process,  # Process name
+                        "Pset_Set": "",
+                        "Pset_PD": "",
+                        "Pset_CI": "",
+                        "Pset_CO": "",
+                        "Cset_Set": "",
+                        "Cset_CN": "",
+                        "Cset_CD": "",
+                        "Attrib_Cond": "",
+                        "Val_Cond": "",
+                    }
+                    transformed_df = pd.concat(
+                        [transformed_df, pd.DataFrame([new_row])], ignore_index=True
+                    )
+                else:
+                    # Even if empty, we might still want to add a row if the snippet suggests it?
+                    # The snippet shows empty rows for 2027 for example.
+                    # If we want to include empty rows as well:
+                    # Uncomment the following block if needed:
+
+                    # new_row = {
+                    #     "TimeSlice": "",
+                    #     "LimType": "",
+                    #     "Attribute": "ACTFLO",
+                    #     "Year": yr,
+                    #     "Other_Indexes": "DEMO",
+                    #     "DE": "",
+                    #     "Pset_PN": process,
+                    #     "Pset_Set": "", "Pset_PD": "", "Pset_CI": "", "Pset_CO": "",
+                    #     "Cset_Set": "", "Cset_CN": "", "Cset_CD": "",
+                    #     "Attrib_Cond": "", "Val_Cond": ""
+                    # }
+                    # transformed_df = pd.concat([transformed_df, pd.DataFrame([new_row])], ignore_index=True)
+                    pass
+
+    if transformed_df.empty:
+        return
+
+    # Load the output workbook and find the header in the INS sheet
+    wb = load_workbook(output_file_path)
+    if sheet_name not in wb.sheetnames:
+        print(f"{sheet_name} sheet not found in {output_file_path}.")
+        return
+    ws = wb[sheet_name]
+
+    # Find the header row containing 'Attribute'
+    header_row = find_header_row(ws, "Attribute")
+
+    # --- Clear existing data below the header row ---
+    # Delete all rows after the header row, if any
+    max_row = ws.max_row
+    if max_row > header_row:
+        ws.delete_rows(header_row + 1, max_row - header_row)
+
+    # Get column headers and indices as before
+    headers = {cell.value: cell.column for cell in ws[header_row]}
+    transformed_columns = [
+        "TimeSlice",
+        "LimType",
+        "Attribute",
+        "Year",
+        "Other_Indexes",
+        "DE",
+        "Pset_PN",
+        "Pset_Set",
+        "Pset_PD",
+        "Pset_CI",
+        "Pset_CO",
+        "Cset_Set",
+        "Cset_CN",
+        "Cset_CD",
+        "Attrib_Cond",
+        "Val_Cond",
+    ]
+
+    col_indices = {}
+    for col_name in transformed_columns:
+        if col_name in headers:
+            col_indices[col_name] = headers[col_name]
+        else:
+            last_col = ws.max_column
+            ws.cell(row=header_row, column=last_col + 1, value=col_name)
+            col_indices[col_name] = last_col + 1
+
+    # Write the transformed data starting right after the header row
+    start_row = header_row + 1
+    for i, row_data in transformed_df.iterrows():
+        for col_name in transformed_columns:
+            ws.cell(
+                row=start_row + i,
+                column=col_indices[col_name],
+                value=row_data[col_name],
+            )
+
+    wb.save(output_file_path)
+    print(
+        f"ACTFLO~DEMO data extracted and replaced in {output_file_path}, sheet {sheet_name}."
+    )
+
+
 # Paths and URLs
 TIMES_FILE_PATH = "output_data/vt_DE_tra.xlsx"
 
@@ -1298,7 +1489,9 @@ for process in tra_processes:
 
 # Calculate ACT_EFF attributes
 updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)
-
+extract_and_save_actflo_demo_data(
+    updated_df, output_file_path="output_data/tra_occupancy_rate.xlsx", sheet_name="INS"
+)
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, updated_units_mapping)
 update_process_list_sheet(TIMES_FILE_PATH, updated_units_mapping)
