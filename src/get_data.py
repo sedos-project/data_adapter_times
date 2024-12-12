@@ -348,7 +348,10 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             )
 
             if output_commodity.size > 0:  # Check if array is not empty
-                primary_cg = output_commodity[0]
+                if "exo_" in output_commodity[0]:
+                    primary_cg = "DEMO"
+                else:
+                    primary_cg = output_commodity[0]
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Find the Tact unit by searching the resource in units_mapping
