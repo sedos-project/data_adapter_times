@@ -891,9 +891,17 @@ def data_mapping_internal(times_df, process_name, api_process_data):
         isinstance(comm_out, str) and "exo_" in comm_out.lower()
         for comm_out in times_df_filtered["Comm-OUT"]
     ):
-        cap2act_value = (
-            0.000000001  # Set CAP2ACT to 0.001 if "exo_" is in any output commodity
-        )
+        if (
+            process_name == "tra_road_const_ice_diesel_0"
+            or process_name == "tra_road_agri_ice_diesel_1"
+            or process_name == "tra_road_agri_ice_diesel_0"
+            or process_name == "tra_road_const_ice_diesel_1"
+        ):
+            cap2act_value = 1
+        else:
+            cap2act_value = (
+                0.000000001  # Set CAP2ACT to 0.001 if "exo_" is in any output commodity
+            )
 
     # Check if the process name contains "battery"
     elif "battery" in process_name.lower():
@@ -1024,111 +1032,35 @@ def calculate_act_eff(times_df, process_list_file_path):
     for start_index, end_index, process_name in process_positions:
         times_df_filtered = times_df.loc[start_index:end_index]
 
-        # Check if the process is 'tra_road' type
-        if process_name.startswith("tra_road"):
-            # For 'tra_road' processes, check for 'INPUT' or 'ACT_EFF' rows
-            input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-            act_eff_rows = times_df_filtered[
-                times_df_filtered["Attribute"] == "ACT_EFF"
-            ]
-            flo_shar_rows = times_df_filtered[
-                times_df_filtered["Attribute"] == "FLO_SHAR"
-            ]
+        if (
+            process_name == "tra_road_const_ice_diesel_0"
+            or process_name == "tra_road_agri_ice_diesel_1"
+            or process_name == "tra_road_agri_ice_diesel_0"
+            or process_name == "tra_road_const_ice_diesel_1"
+        ):
+            continue
+        else:
+            # Check if the process is 'tra_road' type
+            if process_name.startswith("tra_road"):
+                # For 'tra_road' processes, check for 'INPUT' or 'ACT_EFF' rows
+                input_rows = times_df_filtered[
+                    times_df_filtered["Attribute"] == "INPUT"
+                ]
+                act_eff_rows = times_df_filtered[
+                    times_df_filtered["Attribute"] == "ACT_EFF"
+                ]
+                flo_shar_rows = times_df_filtered[
+                    times_df_filtered["Attribute"] == "FLO_SHAR"
+                ]
 
-            # New condition for processes containing '_hyb_'
-            if "_hyb_" in process_name and not input_rows.empty:
-                act_eff_values_list = (
-                    []
-                )  # List to store act_eff values for each input row
-                for _, input_row in input_rows.iterrows():
-                    act_eff_values = {}
-                    for year in [
-                        "2021",
-                        "2024",
-                        "2027",
-                        "2030",
-                        "2035",
-                        "2040",
-                        "2045",
-                        "2050",
-                        "2060",
-                        "2070",
-                    ]:
-                        try:
-                            input_value = float(input_row[year])
-                            act_eff_values[year] = input_value / 1000000000
-                        except (ValueError, ZeroDivisionError, KeyError, TypeError):
-                            act_eff_values[year] = ""
-                    act_eff_values_list.append(act_eff_values)
-
-                # Replace the input rows' values with CEFF and calculated act_eff values
-                for idx, input_row in enumerate(input_rows.index):
-                    for year, value in act_eff_values_list[idx].items():
-                        times_df.at[input_row, year] = value
-                    times_df.at[input_row, "Attribute"] = (
-                        "CEFF"  # Change Attribute to CEFF
-                    )
-
-                continue  # Skip further processing for '_hyb_' processes
-
-            # Existing 'tra_road' condition for processes without '_hyb_'
-            if input_rows.empty and not act_eff_rows.empty and not flo_shar_rows.empty:
-                act_eff_row = act_eff_rows.iloc[0]
-                input_row = act_eff_row
-            elif not input_rows.empty:
-                input_row = input_rows.iloc[0]
-            else:
-                print(
-                    f"No 'INPUT' or 'ACT_EFF' found for tra_road process {process_name}, skipping."
-                )
-                continue  # Skip if no input or act_eff data
-
-            act_eff_values = {}
-            for year in [
-                "2021",
-                "2024",
-                "2027",
-                "2030",
-                "2035",
-                "2040",
-                "2045",
-                "2050",
-                "2060",
-                "2070",
-            ]:
-                try:
-                    input_value = float(input_row[year])
-                    act_eff_values[year] = input_value / 1000000000
-                except (ValueError, ZeroDivisionError, KeyError, TypeError):
-                    act_eff_values[year] = ""
-
-            if act_eff_rows.empty:
-                # Create a new EFF row if ACT_EFF was not originally present
-                new_row = {col: "" for col in times_df.columns}
-                new_row["TechName"] = process_name
-                new_row["Attribute"] = "EFF"
-                for year, value in act_eff_values.items():
-                    new_row[year] = value
-                new_row_df = pd.DataFrame([new_row])
-                times_df = pd.concat(
-                    [
-                        times_df.iloc[: end_index + 1],
-                        new_row_df,
-                        times_df.iloc[end_index + 1 :],
-                    ]
-                ).reset_index(drop=True)
-            else:
-                # Update the existing ACT_EFF (now 'EFF') row with calculated values
-                for year, value in act_eff_values.items():
-                    times_df.at[input_row.name, year] = value
-
-            # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes for tra_road
-            for attr in ["INPUT", "OUTPUT"]:
-                attr_rows = times_df_filtered[times_df_filtered["Attribute"] == attr]
-                for idx in attr_rows.index:
-                    times_df.loc[
-                        idx,
-                        [
+                # New condition for processes containing '_hyb_'
+                if "_hyb_" in process_name and not input_rows.empty:
+                    act_eff_values_list = (
+                        []
+                    )  # List to store act_eff values for each input row
+                    for _, input_row in input_rows.iterrows():
+                        act_eff_values = {}
+                        for year in [
                             "2021",
                             "2024",
                             "2027",
@@ -1139,113 +1071,205 @@ def calculate_act_eff(times_df, process_list_file_path):
                             "2050",
                             "2060",
                             "2070",
-                        ],
-                    ] = ""
+                        ]:
+                            try:
+                                input_value = float(input_row[year])
+                                act_eff_values[year] = input_value / 1000000000
+                            except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                                act_eff_values[year] = ""
+                        act_eff_values_list.append(act_eff_values)
 
-            continue  # Skip further processing for tra_road
+                    # Replace the input rows' values with CEFF and calculated act_eff values
+                    for idx, input_row in enumerate(input_rows.index):
+                        for year, value in act_eff_values_list[idx].items():
+                            times_df.at[input_row, year] = value
+                        times_df.at[input_row, "Attribute"] = (
+                            "CEFF"  # Change Attribute to CEFF
+                        )
 
-        # For other processes, proceed with the existing checks
-        # Find the row which has 'Comm-OUT' starting with 'exo_'
-        exo_rows = times_df_filtered[
-            times_df_filtered["Comm-OUT"].astype(str).str.startswith("exo_")
-        ]
-        if exo_rows.empty:
-            print(f"No 'exo_' in 'Comm-OUT' for process {process_name}")
-            continue
+                    continue  # Skip further processing for '_hyb_' processes
 
-        exo_row = exo_rows.iloc[0]  # Take the first one
+                # Existing 'tra_road' condition for processes without '_hyb_'
+                if (
+                    input_rows.empty
+                    and not act_eff_rows.empty
+                    and not flo_shar_rows.empty
+                ):
+                    act_eff_row = act_eff_rows.iloc[0]
+                    input_row = act_eff_row
+                elif not input_rows.empty:
+                    input_row = input_rows.iloc[0]
+                else:
+                    print(
+                        f"No 'INPUT' or 'ACT_EFF' found for tra_road process {process_name}, skipping."
+                    )
+                    continue  # Skip if no input or act_eff data
 
-        # Find the row which has 'ACTFLO~DEMO' in 'Attribute' column
-        actflo_demo_rows = times_df_filtered[
-            times_df_filtered["Attribute"] == "ACTFLO~DEMO"
-        ]
-        if actflo_demo_rows.empty:
-            print(f"No 'ACTFLO~DEMO' in 'Attribute' for process {process_name}")
-            continue
+                act_eff_values = {}
+                for year in [
+                    "2021",
+                    "2024",
+                    "2027",
+                    "2030",
+                    "2035",
+                    "2040",
+                    "2045",
+                    "2050",
+                    "2060",
+                    "2070",
+                ]:
+                    try:
+                        input_value = float(input_row[year])
+                        act_eff_values[year] = input_value / 1000000000
+                    except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                        act_eff_values[year] = ""
 
-        actflo_demo_row = actflo_demo_rows.iloc[0]
+                if act_eff_rows.empty:
+                    # Create a new EFF row if ACT_EFF was not originally present
+                    new_row = {col: "" for col in times_df.columns}
+                    new_row["TechName"] = process_name
+                    new_row["Attribute"] = "EFF"
+                    for year, value in act_eff_values.items():
+                        new_row[year] = value
+                    new_row_df = pd.DataFrame([new_row])
+                    times_df = pd.concat(
+                        [
+                            times_df.iloc[: end_index + 1],
+                            new_row_df,
+                            times_df.iloc[end_index + 1 :],
+                        ]
+                    ).reset_index(drop=True)
+                else:
+                    # Update the existing ACT_EFF (now 'EFF') row with calculated values
+                    for year, value in act_eff_values.items():
+                        times_df.at[input_row.name, year] = value
 
-        # Initialize a flag to check whether we need to create a new ACT_EFF row or update existing one
-        create_new_act_eff = False
+                # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes for tra_road
+                for attr in ["INPUT", "OUTPUT"]:
+                    attr_rows = times_df_filtered[
+                        times_df_filtered["Attribute"] == attr
+                    ]
+                    for idx in attr_rows.index:
+                        times_df.loc[
+                            idx,
+                            [
+                                "2021",
+                                "2024",
+                                "2027",
+                                "2030",
+                                "2035",
+                                "2040",
+                                "2045",
+                                "2050",
+                                "2060",
+                                "2070",
+                            ],
+                        ] = ""
 
-        # Find the first row which has 'INPUT' in 'Attribute' column
-        input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-        if not input_rows.empty:
-            input_row = input_rows.iloc[0]
-            create_new_act_eff = True  # We will create a new ACT_EFF row
-        else:
-            # If 'INPUT' not found, check for 'ACT_EFF' attribute
-            act_eff_rows = times_df_filtered[
-                times_df_filtered["Attribute"] == "ACT_EFF"
+                continue  # Skip further processing for tra_road
+
+            # For other processes, proceed with the existing checks
+            # Find the row which has 'Comm-OUT' starting with 'exo_'
+            exo_rows = times_df_filtered[
+                times_df_filtered["Comm-OUT"].astype(str).str.startswith("exo_")
             ]
-            if act_eff_rows.empty:
-                print(
-                    f"No 'INPUT' or 'ACT_EFF' in 'Attribute' for process {process_name}"
-                )
+            if exo_rows.empty:
+                print(f"No 'exo_' in 'Comm-OUT' for process {process_name}")
                 continue
-            input_row = act_eff_rows.iloc[0]
+
+            exo_row = exo_rows.iloc[0]  # Take the first one
+
+            # Find the row which has 'ACTFLO~DEMO' in 'Attribute' column
+            actflo_demo_rows = times_df_filtered[
+                times_df_filtered["Attribute"] == "ACTFLO~DEMO"
+            ]
+            if actflo_demo_rows.empty:
+                print(f"No 'ACTFLO~DEMO' in 'Attribute' for process {process_name}")
+                continue
+
+            actflo_demo_row = actflo_demo_rows.iloc[0]
+
+            # Initialize a flag to check whether we need to create a new ACT_EFF row or update existing one
             create_new_act_eff = False
 
-        # Now compute the ACT_EFF values for each year
-        act_eff_values = {}
-        years_columns = [
-            "2021",
-            "2024",
-            "2027",
-            "2030",
-            "2035",
-            "2040",
-            "2045",
-            "2050",
-            "2060",
-            "2070",
-        ]
-        for year in years_columns:
-            try:
-                input_value = float(input_row[year])
-                exo_value = float(exo_row[year])
-                actflo_demo_value = float(actflo_demo_row[year])
-                act_eff = exo_value / actflo_demo_value / input_value
-                act_eff_values[year] = act_eff
-            except (ValueError, ZeroDivisionError, KeyError, TypeError):
-                # Handle any errors, set value to empty string
-                act_eff_values[year] = ""
-
-        if create_new_act_eff:
-            # Create a new ACT_EFF row and insert after end_index
-            new_row = {
-                col: "" for col in times_df.columns
-            }  # Initialize with empty strings
-            new_row["TechName"] = process_name
-            new_row["Attribute"] = "EFF"
-
-            # Set the values for the years
-            for year, value in act_eff_values.items():
-                new_row[year] = value
-
-            # Convert new_row to DataFrame
-            new_row_df = pd.DataFrame([new_row])
-
-            # Insert new_row_df into times_df after end_index
-            # Split times_df into before, new_row_df, after
-            times_df = pd.concat(
-                [
-                    times_df.iloc[: end_index + 1],
-                    new_row_df,
-                    times_df.iloc[end_index + 1 :],
+            # Find the first row which has 'INPUT' in 'Attribute' column
+            input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
+            if not input_rows.empty:
+                input_row = input_rows.iloc[0]
+                create_new_act_eff = True  # We will create a new ACT_EFF row
+            else:
+                # If 'INPUT' not found, check for 'ACT_EFF' attribute
+                act_eff_rows = times_df_filtered[
+                    times_df_filtered["Attribute"] == "ACT_EFF"
                 ]
-            ).reset_index(drop=True)
-        else:
-            # Update the existing ACT_EFF row with the new values
-            act_eff_index = input_row.name  # The index of the existing ACT_EFF row
-            for year, value in act_eff_values.items():
-                times_df.at[act_eff_index, year] = value
+                if act_eff_rows.empty:
+                    print(
+                        f"No 'INPUT' or 'ACT_EFF' in 'Attribute' for process {process_name}"
+                    )
+                    continue
+                input_row = act_eff_rows.iloc[0]
+                create_new_act_eff = False
 
-        # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes
-        for attr in ["INPUT", "OUTPUT"]:
-            attr_rows = times_df_filtered[times_df_filtered["Attribute"] == attr]
-            for idx in attr_rows.index:
-                times_df.loc[idx, years_columns] = ""
+            # Now compute the ACT_EFF values for each year
+            act_eff_values = {}
+            years_columns = [
+                "2021",
+                "2024",
+                "2027",
+                "2030",
+                "2035",
+                "2040",
+                "2045",
+                "2050",
+                "2060",
+                "2070",
+            ]
+            for year in years_columns:
+                try:
+                    input_value = float(input_row[year])
+                    exo_value = float(exo_row[year])
+                    actflo_demo_value = float(actflo_demo_row[year])
+                    act_eff = exo_value / actflo_demo_value / input_value
+                    act_eff_values[year] = act_eff
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    # Handle any errors, set value to empty string
+                    act_eff_values[year] = ""
+
+            if create_new_act_eff:
+                # Create a new ACT_EFF row and insert after end_index
+                new_row = {
+                    col: "" for col in times_df.columns
+                }  # Initialize with empty strings
+                new_row["TechName"] = process_name
+                new_row["Attribute"] = "EFF"
+
+                # Set the values for the years
+                for year, value in act_eff_values.items():
+                    new_row[year] = value
+
+                # Convert new_row to DataFrame
+                new_row_df = pd.DataFrame([new_row])
+
+                # Insert new_row_df into times_df after end_index
+                # Split times_df into before, new_row_df, after
+                times_df = pd.concat(
+                    [
+                        times_df.iloc[: end_index + 1],
+                        new_row_df,
+                        times_df.iloc[end_index + 1 :],
+                    ]
+                ).reset_index(drop=True)
+            else:
+                # Update the existing ACT_EFF row with the new values
+                act_eff_index = input_row.name  # The index of the existing ACT_EFF row
+                for year, value in act_eff_values.items():
+                    times_df.at[act_eff_index, year] = value
+
+            # Clear yearly data in rows with 'INPUT' and 'OUTPUT' attributes
+            for attr in ["INPUT", "OUTPUT"]:
+                attr_rows = times_df_filtered[times_df_filtered["Attribute"] == attr]
+                for idx in attr_rows.index:
+                    times_df.loc[idx, years_columns] = ""
 
     times_df = times_df.fillna("")
 
@@ -1254,7 +1278,7 @@ def calculate_act_eff(times_df, process_list_file_path):
 
 
 def extract_and_save_actflo_demo_data(
-    times_df, output_file_path="tra_occupancy.xlsx", sheet_name="INS"
+    times_df, output_file_path="output_data/Scen_tra_actflo.xlsx", sheet_name="INS"
 ):
     """
     Extracts rows from times_df where Attribute == 'ACTFLO~DEMO', transforms them, and writes them
@@ -1493,7 +1517,7 @@ for process in tra_processes:
 # Calculate ACT_EFF attributes
 updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)
 extract_and_save_actflo_demo_data(
-    updated_df, output_file_path="output_data/tra_occupancy_rate.xlsx", sheet_name="INS"
+    updated_df, output_file_path="output_data/Scen_tra_actflo.xlsx", sheet_name="INS"
 )
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, updated_units_mapping)
