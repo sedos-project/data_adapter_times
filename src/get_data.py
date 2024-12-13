@@ -318,7 +318,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 else:
                     primary_cg = output_commodity[0]
-                row[primary_cg_col - 1].value = primary_cg
+                # row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = units_mapping.get(
