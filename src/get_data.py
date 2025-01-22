@@ -322,12 +322,13 @@ def update_process_list_sheet(excel_file_path, units_mapping):
     vintage_col = headers.get("Vintage")
     primary_cg_col = headers.get("PrimaryCG")
     tact_col = headers.get("Tact")
+    tcap_col = headers.get("Tcap")
 
-    if not (techname_col and vintage_col and primary_cg_col and tact_col):
+    if not (techname_col and vintage_col and primary_cg_col and tact_col and tcap_col):
         print("Some required columns are missing in 'Process List' sheet.")
         return
 
-    # Set Vintage column to 'NO' and populate PrimaryCG and Tact
+    # Set Vintage column to 'NO' and populate PrimaryCG, Tact, and TCap
     for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
         techname_cell = row[techname_col - 1]
         if techname_cell.value:
@@ -358,8 +359,20 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 for resource_name, fields in units_mapping.items():
                     for field in fields:
                         if field["field_name"] == f"conversion_factor_{primary_cg}":
-                            row[tact_col - 1].value = field["unit"]
+                            if field["unit"]:
+                                row[tact_col - 1].value = field["unit"]
+                            else:
+                                row[tact_col - 1].value = "notFound"
                             break
+                        else:
+                            row[tact_col - 1].value = "notFound"
+                            break
+
+                # Additional logic for DEMO
+                if primary_cg == "DEMO":
+                    row[tact_col - 1].value = "BPkm"
+                    # Set TCap to 'Vehicle unit' if available
+                    row[tcap_col - 1].value = "Vehicle unit"
 
     wb.save(excel_file_path)
     print("Process List sheet updated with Vintage, PrimaryCG, and Tact columns.")
@@ -884,6 +897,29 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
+
+    if process_name.endswith("_0"):
+        ncap_bnd_row = pd.Series(
+            {
+                "TechName": process_name,
+                "Attribute": "NCAP_BND",
+                "LimType": "FX",
+                "2021": 0,
+                "2024": 0,
+                "2027": 0,
+                "2030": 0,
+                "2035": 0,
+                "2040": 0,
+                "2045": 0,
+                "2050": 0,
+                "2060": 0,
+                "2070": 0,
+            }
+        )
+        times_df_filtered = pd.concat(
+            [times_df_filtered, ncap_bnd_row.to_frame().T],
+            ignore_index=True,
+        )
 
     # Implement CAP2ACT logic
     # Check if any output commodities contain "exo_"
