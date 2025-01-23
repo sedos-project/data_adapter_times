@@ -37,10 +37,12 @@ def define_energy_model_units():
     scaled_unit("kpkm", "pkm", 1e3)
     scaled_unit("Mpkm", "kpkm", 1e3)
     scaled_unit("Gpkm", "Mpkm", 1e3)
+    scaled_unit("Bpkm", "Mpkm", 1e3)
 
     scaled_unit("ktkm", "tkm", 1e3)
     scaled_unit("Mtkm", "ktkm", 1e3)
     scaled_unit("Gtkm", "Mtkm", 1e3)
+    scaled_unit("Btkm", "Mtkm", 1e3)
 
     scaled_unit("tCO2eq", "kgCO2eq", 1e3)
     scaled_unit("ktCO2eq", "tCO2eq", 1e3)
@@ -157,6 +159,7 @@ def define_energy_model_units():
     NamedComposedUnit("EUR/kW*a,", unit("EUR") / unit("kW") * unit("a"))
 
     NamedComposedUnit("EUR/pkm", unit("EUR") / unit("pkm"))
+    NamedComposedUnit("MEUR/pkm", unit("MEUR") / unit("pkm"))
     NamedComposedUnit("EUR/kpkm", unit("EUR") / unit("kpkm"))
     NamedComposedUnit("MEUR/GW", unit("MEUR") / unit("GW"))
     NamedComposedUnit("M€/GW", unit("MEUR") / unit("GW"))
