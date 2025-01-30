@@ -469,7 +469,11 @@ def data_mapping(times_df, process_name, is_group=False):
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
 
+    # Fetch metadata
+    metadata = fetch_process_metadata(process_name)
+
     if is_group:
+        grp_name = process_name
         # Divide the data based on the 'type' column
         process_groups = api_process_data.groupby("type")
 
@@ -478,9 +482,13 @@ def data_mapping(times_df, process_name, is_group=False):
         for process, group_data in process_groups:
             if process.endswith("_ag"):  # Skip processes ending with _ag
                 continue
+
+            # Remove columns where all values are NaN (i.e., columns without any data)
+            group_data = group_data.dropna(axis=1, how="all")
+
             handled_processes.append(process)
             times_df = data_mapping_internal(
-                times_df, process, group_data
+                times_df, process, group_data, metadata, grp_name
             )  # Call internal function for each process
             process_count += 1  # Increment the counter for each handled process
 
@@ -489,13 +497,12 @@ def data_mapping(times_df, process_name, is_group=False):
         )
         return times_df
     else:
-        return data_mapping_internal(times_df, process_name, api_process_data)
+        return data_mapping_internal(
+            times_df, process_name, api_process_data, metadata, grp_name="default"
+        )
 
 
-def data_mapping_internal(times_df, process_name, api_process_data):
-
-    # Fetch metadata
-    metadata = fetch_process_metadata(process_name)
+def data_mapping_internal(times_df, process_name, api_process_data, metadata, grp_name):
 
     # Update units_mapping
     global units_mapping, updated_units_mapping
@@ -590,7 +597,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                             # Fetch unit from units_mapping by matching resource_name to process_name
                             source_unit = None
                             for resource_name, fields in units_mapping.items():
-                                if resource_name == process_name:
+                                if resource_name == process_name or grp_name:
                                     for field in fields:
                                         if field["field_name"] == api_col:
                                             source_unit = field["unit"]
@@ -626,6 +633,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         )
                                         converted_value = api_value
                                 else:
+                                    print(
+                                        f"Source unit {source_unit} for {api_col} not found."
+                                    )
                                     converted_value = api_value  # If no unit is found, use the value as is
 
                                 for idx in matching_row.index:
@@ -669,6 +679,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                             )
                                             converted_value = api_value
                                     else:
+                                        print(
+                                            f"Source unit {source_unit} for {api_col} not found."
+                                        )
                                         converted_value = api_value  # If no unit is found, use the value as is
 
                                     for idx in matching_row.index:
@@ -778,7 +791,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 resource_name,
                                 fields,
                             ) in units_mapping.items():
-                                if resource_name == process_name:
+                                if resource_name == process_name or grp_name:
                                     for field in fields:
                                         if field["field_name"] == api_col:
                                             source_unit = field["unit"]
@@ -836,6 +849,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                 )
                                                 converted_value = api_value
                                         else:
+                                            print(
+                                                f"Source unit {source_unit} for {api_col} not found."
+                                            )
                                             converted_value = api_value  # If no unit is found, use the value as is
                                         times_df_filtered.at[new_row_idx, str(year)] = (
                                             1 / converted_value
@@ -877,6 +893,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                 )
                                                 converted_value = api_value
                                         else:
+                                            print(
+                                                f"Source unit {source_unit} for {api_col} not found."
+                                            )
                                             converted_value = api_value  # If no unit is found, use the value as is
                                         times_df_filtered.at[new_row_idx, str(year)] = (
                                             converted_value
@@ -928,6 +947,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                     )
                                                     converted_value = api_value
                                             else:
+                                                print(
+                                                    f"Source unit {source_unit} for {api_col} not found."
+                                                )
                                                 converted_value = api_value  # If no unit is found, use the value as is
                                             times_df_filtered.at[idx, str(year)] = (
                                                 1 / converted_value
@@ -973,6 +995,9 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                                     )
                                                     converted_value = api_value
                                             else:
+                                                print(
+                                                    f"Source unit {source_unit} for {api_col} not found."
+                                                )
                                                 converted_value = api_value  # If no unit is found, use the value as is
                                             times_df_filtered.at[idx, str(year)] = (
                                                 converted_value
