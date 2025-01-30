@@ -8,6 +8,9 @@ from openpyxl.utils import get_column_letter
 fetch_data_counter = 0
 units_mapping = {}
 
+# Global set to store all unique units
+all_unique_units = set()
+
 
 def format_and_save_excel(file_path, processed_df):
     """
@@ -177,27 +180,36 @@ def format_and_save_excel(file_path, processed_df):
 
 def data_units(metadata):
     """
-    Converts the units of the fields in the API data according to the metadata.
+    Extracts unit information from metadata and updates the global set `all_unique_units`.
 
     Parameters:
-    api_data (pandas.DataFrame): The DataFrame containing the fetched API data.
     metadata (dict): The metadata containing information about the units.
 
     Returns:
-    pandas.DataFrame: The DataFrame with units converted to the standard units.
+    dict: A dictionary where keys are resource names and values are lists of field names and units.
     """
-    units_dict = {}  # Initialize an empty dictionary to store units
+    units_dict = {}
 
     if not metadata:
-        return units_dict  # Return as is if no data or metadata is present
+        return units_dict
 
     for resource in metadata.get("resources", []):
+        resource_name = resource.get("name", "").replace("model_draft.", "")
         fields = resource.get("schema", {}).get("fields", [])
+
+        # Initialize the list for each resource if it doesn't exist
+        if resource_name not in units_dict:
+            units_dict[resource_name] = []
+
+        # Append each field and its unit as a dictionary to the resource's list
         for field in fields:
             field_name = field["name"]
             field_unit = field.get("unit")
             if field_name and field_unit:
-                units_dict[field_name] = field_unit  # Store the field_name and unit
+                units_dict[resource_name].append(
+                    {"field_name": field_name, "unit": field_unit}
+                )
+                all_unique_units.add(field_unit)  # Collect unique units
 
     return units_dict
 
@@ -216,16 +228,7 @@ def update_commodity_list_units(excel_file_path, units_mapping):
         print("Commodity List sheet not found in the Excel file.")
         return
 
-    # Get header row
-    header_row = None
-    for row in ws.iter_rows(min_row=1, max_row=10, values_only=False):
-        for cell in row:
-            if cell.value == "CommName":
-                header_row = cell.row
-                break
-        if header_row is not None:
-            break
-
+    header_row = find_header_row(ws, "CommName")
     if header_row is None:
         print("CommName header not found in Commodity List sheet.")
         return
@@ -421,7 +424,11 @@ def data_mapping(times_df, process_name, is_group=False):
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
 
+    # Fetch metadata
+    metadata = fetch_process_metadata(process_name)
+
     if is_group:
+        grp_name = process_name
         # Divide the data based on the 'type' column
         process_groups = api_process_data.groupby("type")
 
@@ -436,7 +443,7 @@ def data_mapping(times_df, process_name, is_group=False):
 
             handled_processes.append(process)
             times_df = data_mapping_internal(
-                times_df, process, group_data
+                times_df, process, group_data, metadata, grp_name
             )  # Call internal function for each process
             process_count += 1  # Increment the counter for each handled process
 
@@ -445,16 +452,15 @@ def data_mapping(times_df, process_name, is_group=False):
         )
         return times_df
     else:
-        return data_mapping_internal(times_df, process_name, api_process_data)
+        return data_mapping_internal(
+            times_df, process_name, api_process_data, metadata, grp_name="default"
+        )
 
 
-def data_mapping_internal(times_df, process_name, api_process_data):
-
-    # Fetch metadata
-    metadata = fetch_process_metadata(process_name)
+def data_mapping_internal(times_df, process_name, api_process_data, metadata, grp_name):
 
     # Update units_mapping
-    global units_mapping
+    global units_mapping, updated_units_mapping
     units_mapping.update(data_units(metadata))
 
     # Filter for the specific process and keep track of the index range
@@ -889,125 +895,11 @@ times_df = pd.read_pickle(PICKLE_FILE_PATH)
 updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
-process_groups = [
-    "pow_combustion_cc_biogas_1",
-    "pow_combustion_cc_biomass_1",
-    "pow_combustion_cc_biomass_2",
-    "pow_combustion_cc_chp_biomass_1",
-    "pow_combustion_cc_chp_ccs_methane_1",
-    "pow_combustion_cc_chp_coal_1",
-    "pow_combustion_cc_chp_hydrogen_1",
-    "pow_combustion_cc_chp_lignite_1",
-    "pow_combustion_cc_chp_methane_1",
-    "pow_combustion_cc_chp_methane_2",
-    "pow_combustion_cc_chp_oil_1",
-    "pow_combustion_cc_chp_syngas_1",
-    "pow_combustion_cc_lignite_1",
-    "pow_combustion_cc_methane_1",
-    "pow_combustion_cc_methane_2",
-    "pow_combustion_cc_methane_3",
-    "pow_combustion_cc_oil_1",
-    "pow_combustion_cc_oil_2",
-    "pow_combustion_cc_oil_3",
-    "pow_combustion_cc_waste_1",
-    "pow_combustion_cc_waste_2",
-    "pow_combustion_fc_biogas_1",
-    "pow_combustion_fc_biogas_2",
-    "pow_combustion_fc_syngas_1",
-    "pow_combustion_fc_syngas_2",
-    "pow_combustion_fc_syngas_3",
-    "pow_combustion_gt_biogas_1",
-    "pow_combustion_gt_biogas_2",
-    "pow_combustion_gt_biogas_3",
-    "pow_combustion_gt_biogas_4",
-    "pow_combustion_gt_chp_biogas_1",
-    "pow_combustion_gt_chp_biogas_2",
-    "pow_combustion_gt_chp_biomass_1",
-    "pow_combustion_gt_chp_biomass_2",
-    "pow_combustion_gt_chp_biomass_3",
-    "pow_combustion_gt_chp_ccs_methane_1",
-    "pow_combustion_gt_chp_oil_1",
-    "pow_combustion_gt_chp_oil_2",
-    "pow_combustion_gt_chp_syngas_1",
-    "pow_combustion_gt_chp_syngas_2",
-    "pow_combustion_gt_hydrogen_1",
-    "pow_combustion_gt_methane_1",
-    "pow_combustion_gt_oil_1",
-    "pow_combustion_gt_oil_2",
-    "pow_combustion_gt_syngas_1",
-    "pow_combustion_ic_biogas_1",
-    "pow_combustion_ic_biogas_2",
-    "pow_combustion_ic_ccs_biogas_1",
-    "pow_combustion_ic_chp_biogas_1",
-    "pow_combustion_ic_chp_biogas_2",
-    "pow_combustion_ic_chp_biogas_3",
-    "pow_combustion_ic_chp_biogas_4",
-    "pow_combustion_ic_chp_biogas_5",
-    "pow_combustion_ic_chp_ccs_biogas_1",
-    "pow_combustion_ic_chp_ccs_methane_1",
-    "pow_combustion_ic_chp_methane_1",
-    "pow_combustion_ic_chp_oil_1",
-    "pow_combustion_ic_chp_oil_2",
-    "pow_combustion_ic_chp_syngas_1",
-    "pow_combustion_ic_chp_syngas_2",
-    "pow_combustion_ic_chp_syngas_3",
-    "pow_combustion_ic_diesel_1",
-    "pow_combustion_ic_methane_1",
-    "pow_combustion_ic_oil_1",
-    "pow_combustion_ic_oil_2",
-    "pow_combustion_ic_oil_3",
-    "pow_combustion_ic_syngas_1",
-    "pow_combustion_ic_syngas_2",
-    "pow_combustion_ic_syngas_3",
-    "pow_combustion_ic_syngas_4",
-    "pow_combustion_ic_syngas_5",
-    "pow_combustion_ic_syngas_6",
-    "pow_combustion_st_biogas_1",
-    "pow_combustion_st_biomass_1",
-    "pow_combustion_st_biomass_2",
-    "pow_combustion_st_biomass_3",
-    "pow_combustion_st_biomass_4",
-    "pow_combustion_st_biomass_5",
-    "pow_combustion_st_ccs_biomass_1",
-    "pow_combustion_st_ccs_coal_1",
-    "pow_combustion_st_ccs_lignite_1",
-    "pow_combustion_st_chp_biogas_1",
-    "pow_combustion_st_chp_biomass_1",
-    "pow_combustion_st_chp_biomass_2",
-    "pow_combustion_st_chp_biomass_3",
-    "pow_combustion_st_chp_biomass_4",
-    "pow_combustion_st_chp_biomass_5",
-    "pow_combustion_st_chp_biomass_6",
-    "pow_combustion_st_chp_biomass_7",
-    "pow_combustion_st_chp_biomass_8",
-    "pow_combustion_st_chp_biomass_9",
-    "pow_combustion_st_chp_ccs_biomass_1",
-    "pow_combustion_st_chp_ccs_biomass_2",
-    "pow_combustion_st_chp_ccs_biomass_3",
-    "pow_combustion_st_chp_ccs_biomass_4",
-    "pow_combustion_st_chp_ccs_waste_1",
-    "pow_combustion_st_chp_oil_1",
-    "pow_combustion_st_chp_syngas_1",
-    "pow_combustion_st_chp_waste_1",
-    "pow_combustion_st_chp_waste_2",
-    "pow_combustion_st_chp_waste_3",
-    "pow_combustion_st_chp_waste_4",
-    "pow_combustion_st_coal_1",
-    "pow_combustion_st_coal_2",
-    "pow_combustion_st_oil_1",
-    "pow_combustion_st_syngas_1",
-    "pow_combustion_st_waste_1",
-    "pow_combustion_st_waste_2",
-    "pow_combustion_st_waste_3",
-    "pow_demand",
-    "pow_geothermal_orc_1",
-    "pow_geothermal_st_chp_1",
-    "pow_helper",
-    "pow_marine_1",
-    "pow_nuclear_fis_1",
-    "pow_scalars",
-    "pow_source_nonbio",
-]
+# Read the CSV file into a DataFrame
+pg = pd.read_csv("input_data/Process_Groups.csv")
+
+# Convert the DataFrame column to a list
+process_groups = pg["process_group"].tolist()
 
 # Define a global list to keep track of processes that have been handled
 handled_processes = []
@@ -1035,4 +927,14 @@ updated_df = calculate_act_eff(updated_df)
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
 update_process_list_sheet(TIMES_FILE_PATH, units_mapping)
+
+# Save unique units at the end of execution
+pd.DataFrame(sorted(all_unique_units), columns=["Unique Source Units"]).to_excel(
+    "output_data/unique_units.xlsx",
+    sheet_name="Unique Units",
+    index=False,
+    engine="openpyxl",
+)
+print("Unique source units exported to output_data/unique_units.xlsx")
+
 print("Excel file saved")
