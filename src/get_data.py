@@ -600,7 +600,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                             if not matching_row.empty:
                                 # Fetch unit from units_mapping by matching resource_name to process_name
                                 # If source unit is found, fetch the desired unit
-                                if source_unit:
+                                if source_unit and source_unit != "kWh":
                                     desired_unit = desired_units_mapping.get(
                                         source_unit, None
                                     )
@@ -639,7 +639,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 ]
                                 if not matching_row.empty:
                                     # If source unit is found, fetch the desired unit
-                                    if source_unit:
+                                    if source_unit and source_unit != "kWh":
                                         desired_unit = desired_units_mapping.get(
                                             source_unit, None
                                         )
