@@ -364,9 +364,6 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                             else:
                                 row[tact_col - 1].value = "notFound"
                             break
-                        else:
-                            row[tact_col - 1].value = "notFound"
-                            break
 
                 # Additional logic for DEMO
                 if primary_cg == "DEMO":
