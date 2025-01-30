@@ -61,6 +61,7 @@ def define_energy_model_units():
     scaled_unit("T_units", "G_units", 1e3)
     scaled_unit("Million units", "M_units", 1)
 
+    scaled_unit("vehicle", "vehicle", 1)
     scaled_unit("vehicles", "vehicle", 1)
     scaled_unit("number vehicles", "vehicles", 1)
     scaled_unit("kvehicles", "vehicles", 1e3)
