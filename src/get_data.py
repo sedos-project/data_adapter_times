@@ -594,7 +594,10 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                             # Fetch unit from units_mapping by matching resource_name to process_name
                             source_unit = None
                             for resource_name, fields in units_mapping.items():
-                                if resource_name == process_name or grp_name:
+                                if (
+                                    resource_name == process_name
+                                    or resource_name == grp_name
+                                ):
                                     for field in fields:
                                         if field["field_name"] == api_col:
                                             source_unit = field["unit"]
@@ -788,7 +791,10 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                 resource_name,
                                 fields,
                             ) in units_mapping.items():
-                                if resource_name == process_name or grp_name:
+                                if (
+                                    resource_name == process_name
+                                    or resource_name == grp_name
+                                ):
                                     for field in fields:
                                         if field["field_name"] == api_col:
                                             source_unit = field["unit"]
