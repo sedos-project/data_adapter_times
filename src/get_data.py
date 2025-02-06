@@ -8,9 +8,6 @@ from openpyxl.utils import get_column_letter
 fetch_data_counter = 0
 units_mapping = {}
 
-# Global set to store all unique units
-all_unique_units = set()
-
 
 def format_and_save_excel(file_path, processed_df):
     """
@@ -209,7 +206,6 @@ def data_units(metadata):
                 units_dict[resource_name].append(
                     {"field_name": field_name, "unit": field_unit}
                 )
-                all_unique_units.add(field_unit)  # Collect unique units
 
     return units_dict
 
@@ -235,11 +231,12 @@ def update_commodity_list_units(excel_file_path, units_mapping):
 
     # Get column indices for CommName and Unit
     headers = {cell.value: cell.column for cell in ws[header_row]}
-    if "CommName" in headers and "Unit" in headers:
+    if "CommName" in headers and "Unit" in headers and "Ctype" in headers:
         commname_col = headers["CommName"]
         unit_col = headers["Unit"]
+        ctype_col = headers["Ctype"]
     else:
-        print("CommName or Unit column not found in Commodity List sheet.")
+        print("CommName or Unit or Ctype column not found in Commodity List sheet.")
         return
 
     # For each field_name and field_unit in units_mapping
@@ -252,6 +249,16 @@ def update_commodity_list_units(excel_file_path, units_mapping):
             for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
                 commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
                 if commname_cell.value and isinstance(commname_cell.value, str):
+                    commname = commname_cell.value.strip().lower()
+                    # Check if "_elec_" or other boundary conditions exist
+                    if (
+                        "_elec_" in commname
+                        or commname.startswith("elec_")
+                        or commname.endswith("_elec")
+                        or commname == "elec"
+                    ):
+                        ctype_cell = row[ctype_col - 1]
+                        ctype_cell.value = "ELC"
                     if commname_cell.value.strip().lower() == comm_name.strip().lower():
                         unit_cell = row[unit_col - 1]
                         unit_cell.value = field_unit
@@ -455,13 +462,14 @@ def data_mapping(times_df, process_name, is_group=False):
         process_name,
     )
 
-    # Check if 'version' column exists before filtering
-    if "version" in api_process_data.columns:
-        api_process_data = api_process_data[
-            api_process_data["version"] == "srd_point_draft"
-        ]
-    else:
-        print(f"'version' column not found in the {process_name} process data.")
+    if not api_process_data.empty:
+        # Check if 'version' column exists before filtering
+        if "version" in api_process_data.columns:
+            api_process_data = api_process_data[
+                api_process_data["version"] == "srd_point_draft"
+            ]
+        else:
+            print(f"'version' column not found in the {process_name} process data.")
 
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
@@ -940,14 +948,4 @@ updated_df = calculate_act_eff(updated_df)
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
 update_process_list_sheet(TIMES_FILE_PATH, units_mapping)
-
-# Save unique units at the end of execution
-pd.DataFrame(sorted(all_unique_units), columns=["Unique Source Units"]).to_excel(
-    "output_data/unique_units.xlsx",
-    sheet_name="Unique Units",
-    index=False,
-    engine="openpyxl",
-)
-print("Unique source units exported to output_data/unique_units.xlsx")
-
 print("Excel file saved")

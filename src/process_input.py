@@ -407,6 +407,11 @@ def add_process_sheet_to_workbook(file_path, processed_df):
         output_commodities = row["Comm-OUT"]
         if "import" in tech_name.lower():
             process_sets[tech_name] = "IMP"
+        elif (
+            "x2x_g2p_pemfc_ls_1" in tech_name.lower()
+            or "x2x_g2p_sofc_ls_1" in tech_name.lower()
+        ):
+            process_sets[tech_name] = "CHP"
         elif "storage" in tech_name.lower():
             process_sets[tech_name] = "STS"
         elif pd.notna(output_commodities) and "exo_" in output_commodities.lower():
