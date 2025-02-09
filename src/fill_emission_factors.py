@@ -3,7 +3,7 @@ import requests
 from openpyxl import load_workbook
 
 # Define the file path for output
-SCEN_EMISSION_FILE_PATH = "output_data/Scen_emission_all.xlsx"
+SCEN_EMISSION_FILE_PATH = "output_data/Scen_emission_all_x2x.xlsx"
 CO2_EMISSION_FILE_PATH = "output_data/vt_DE_CO2_Emission.xlsx"
 
 # Initialize a set to track handled processes

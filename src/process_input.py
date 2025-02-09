@@ -96,7 +96,7 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
                     technology_names.append(process)
                     comms_in.append(None)
                     comms_out.append(item)
-                    attributes.append("FLO_SHAR")
+                    attributes.append("OUTPUT")
                     comm_grps.append(None)
                     # Collect elements for the comm_grp
                     if comm_grp_str_out in comm_grp_elements:
@@ -545,8 +545,8 @@ def create_blank_excel(file_path):
 
 def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
     """
-    This function filters out rows from the DataFrame where the Attribute is 'OUTPUT'
-    and the Comm-OUT starts with 'emi_'.
+    Filters out rows from the DataFrame where the Attribute is 'OUTPUT'
+    and the Comm-OUT starts with 'emi_', except for 'emi_co2_neg_air_dacc'.
 
     Args:
         df (pd.DataFrame): The original DataFrame.
@@ -554,9 +554,12 @@ def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The filtered DataFrame.
     """
-    # Filter out rows where 'Attribute' is 'OUTPUT' and 'Comm-OUT' starts with 'emi_'
     filtered_df = df[
-        ~((df["Attribute"] == "OUTPUT") & df["Comm-OUT"].str.startswith("emi_"))
+        ~(
+            (df["Attribute"] == "OUTPUT")
+            & df["Comm-OUT"].str.startswith("emi_")
+            & (df["Comm-OUT"] != "emi_co2_neg_air_dacc")
+        )
     ].copy()
 
     return filtered_df
