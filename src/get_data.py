@@ -270,35 +270,52 @@ def update_commodity_list_units(excel_file_path, units_mapping):
         print("CommName or Unit or Ctype column not found in Commodity List sheet.")
         return
 
-    # For each field_name and field_unit in units_mapping
-    for field_name, field_unit in units_mapping.items():
-        # Only process field names starting with 'conversion_factor_'
-        if field_name.startswith("conversion_factor_"):
-            # Remove the 'conversion_factor_' prefix directly
-            comm_name = field_name[len("conversion_factor_") :]
-            found = False
-            for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
-                commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
-                if commname_cell.value and isinstance(commname_cell.value, str):
-                    commname = commname_cell.value.strip().lower()
-                    # Check if "_elec_" or other boundary conditions exist
-                    if (
-                        "_elec_" in commname
-                        or commname.startswith("elec_")
-                        or commname.endswith("_elec")
-                        or commname == "elec"
-                    ):
-                        ctype_cell = row[ctype_col - 1]
-                        ctype_cell.value = "ELC"
-                    if commname_cell.value.strip().lower() == comm_name.strip().lower():
-                        unit_cell = row[unit_col - 1]
-                        unit_cell.value = field_unit
-                        found = True
-                        break  # Assuming CommName is unique
-            if not found:
-                print(
-                    f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
-                )
+    # Loop over each resource in units_mapping
+    for resource_name, fields in units_mapping.items():
+        for field in fields:
+            field_name = field["field_name"]
+            field_unit = field["unit"]
+            # Only process field names starting with 'conversion_factor_'
+            if field_name.startswith("conversion_factor_"):
+                # Remove the 'conversion_factor_' prefix directly
+                comm_name = field_name[len("conversion_factor_") :]
+                found = False
+                for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
+                    commname_cell = row[
+                        commname_col - 1
+                    ]  # openpyxl columns are 1-based
+                    if commname_cell.value and isinstance(commname_cell.value, str):
+                        commname = commname_cell.value.strip().lower()
+                        # print(commname)
+                        # Check if "_elec_" or other boundary conditions exist
+                        if (
+                            "_elec_" in commname
+                            or commname.startswith("elec_")
+                            or commname.endswith("_elec")
+                            or commname == "elec"
+                        ):
+                            ctype_cell = row[ctype_col - 1]
+                            ctype_cell.value = "ELC"
+                        if (
+                            "_heat_" in commname
+                            or commname.startswith("heat_")
+                            or commname.endswith("_heat")
+                            or commname == "heat"
+                        ):
+                            ctype_cell = row[ctype_col - 1]
+                            ctype_cell.value = "HTHEAT"
+                        if (
+                            commname_cell.value.strip().lower()
+                            == comm_name.strip().lower()
+                        ):
+                            unit_cell = row[unit_col - 1]
+                            unit_cell.value = field_unit
+                            found = True
+                            break  # Assuming CommName is unique
+                if not found:
+                    print(
+                        f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
+                    )
 
     # Save the workbook
     wb.save(excel_file_path)
@@ -611,6 +628,8 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
         for sedos_item, api_cols in matched_columns.items()
     }
 
+    pasted_combinations = set()
+
     # Update the times_df_filtered with the api_process_data based on the matched columns
     for sedos_item, (
         api_cols,
@@ -662,6 +681,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                     "MWh",
                                     "GWh",
                                     "PJ",
+                                    "MWh/MWh",
                                 }:
                                     desired_unit = desired_units_mapping.get(
                                         source_unit, None
@@ -693,6 +713,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                         "MWh",
                                         "GWh",
                                         "PJ",
+                                        "MWh/MWh",
                                     }:
                                         print(
                                             f"Source unit {source_unit} for {api_col} not found."
@@ -716,6 +737,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                         "MWh",
                                         "GWh",
                                         "PJ",
+                                        "MWh/MWh",
                                     }:
                                         desired_unit = desired_units_mapping.get(
                                             source_unit, None
@@ -751,6 +773,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                             "MWh",
                                             "GWh",
                                             "PJ",
+                                            "MWh/MWh",
                                         }:
                                             print(
                                                 f"Source unit {source_unit} for {api_col} not found."
@@ -785,32 +808,72 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                 ).strip("_")
 
                                 # Add values to the matching rows
-                                sum_of_matched_values = 0
+                                current_combo = (flow_share_commodity, year)
+
                                 for idx in matching_row.index:
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
                                     if flow_share_commodity in (comm_in, comm_out):
-                                        if api_value is not None:
-                                            times_df_filtered.at[idx, str(year)] = (
-                                                api_value / 100
-                                            )
-                                            times_df_filtered.at[idx, "LimType"] = (
-                                                constraint
-                                            )
-                                            sum_of_matched_values += api_value / 100
+                                        if current_combo not in pasted_combinations:
+                                            pasted_combinations.add(current_combo)
+                                            if api_value is not None:
+                                                times_df_filtered.at[idx, str(year)] = (
+                                                    api_value / 100
+                                                )
+                                                times_df_filtered.at[idx, "LimType"] = (
+                                                    constraint
+                                                )
+                                        else:
+                                            matching_row_new = times_df_filtered[
+                                                (
+                                                    times_df_filtered["LimType"]
+                                                    == constraint
+                                                )
+                                                & (
+                                                    times_df_filtered["Attribute"]
+                                                    == times_col
+                                                )
+                                                & (
+                                                    (
+                                                        times_df_filtered["Comm-IN"]
+                                                        == flow_share_commodity
+                                                    )
+                                                    | (
+                                                        times_df_filtered["Comm-OUT"]
+                                                        == flow_share_commodity
+                                                    )
+                                                )
+                                            ]
+                                            if matching_row_new.empty:
 
-                                # Handle the rows that do not match the flow share commodity
-                                for idx in matching_row.index:
-                                    if flow_share_commodity not in (
-                                        times_df_filtered.at[idx, "Comm-IN"],
-                                        times_df_filtered.at[idx, "Comm-OUT"],
-                                    ):
-                                        times_df_filtered.at[idx, str(year)] = (
-                                            1 - sum_of_matched_values
-                                        )
-                                        times_df_filtered.at[idx, "LimType"] = (
-                                            constraint
-                                        )
+                                                # Add a new row if the Attribute does not exist
+                                                new_row = pd.Series(
+                                                    {
+                                                        col: pd.NA
+                                                        for col in times_df_filtered.columns
+                                                    }
+                                                )
+                                                new_row["TechName"] = process_name
+                                                new_row["Comm-IN"] = comm_in
+                                                new_row["Comm-OUT"] = comm_out
+                                                new_row["Attribute"] = times_col
+                                                new_row["LimType"] = constraint
+                                                if api_value is not None:
+                                                    new_row[str(year)] = api_value / 100
+                                                times_df_filtered = pd.concat(
+                                                    [
+                                                        times_df_filtered,
+                                                        new_row.to_frame().T,
+                                                    ],
+                                                    ignore_index=True,
+                                                )
+                                            else:
+                                                for idx in matching_row_new.index:
+                                                    if api_value is not None:
+                                                        times_df_filtered.at[
+                                                            idx, str(year)
+                                                        ] = (api_value / 100)
+
                         elif (
                             "availability_constant" in sedos_item
                             or "efficiency_sto_in" in sedos_item
@@ -1089,6 +1152,10 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
         # Check if 'cost_inv_p' exists in the API process data columns
         if "cost_inv_p" in api_process_data.columns:
             cap2act_value = 31.536
+    elif "storage" in process_name.lower():
+        cap2act_value = (
+            0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
+        )
     elif process_name.endswith("_0"):
         # Check if 'capacity_p_inst_0' exists in the API process data columns
         if "capacity_p_inst_0" in api_process_data.columns:
@@ -1137,80 +1204,115 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
 def calculate_act_eff(times_df):
     """
     Calculates the ACT_EFF attribute for processes.
-    Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
-    divided by the first INPUT commodity value for each year.
-    Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
+
+    For processes that have a FLO_SHAR attribute, the new ACT_EFF values are calculated
+    as the first ACT_EFF row's value divided by the first INPUT row's value for each year.
+    Then, for two specific processes ("x2x_g2p_pemfc_ls_1" and "x2x_g2p_sofc_ls_1"),
+    the values are calculated as the first OUTPUT row (with Comm-OUT equal to "sec_elec")
+    divided by the first INPUT row's value.
+
+    In each case, a new row is inserted and the year column values of the INPUT and the used
+    rows (ACT_EFF or OUTPUT) are cleared.
 
     Parameters:
     times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
 
     Returns:
-    pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
+    pandas.DataFrame: The updated DataFrame with the new ACT_EFF (EFF) rows calculated.
     """
-    # Filter processes that start with 'ind_autoproducer'
-    ind_autoproducer_processes = times_df[
-        times_df["TechName"].str.startswith("ind_autoproducer")
-    ]
-
-    if ind_autoproducer_processes.empty:
-        print("No processes starting with 'ind_autoproducer' found.")
-        return times_df
 
     # Create a copy of the DataFrame to work with
     updated_times_df = times_df.copy()
 
-    # Collect process positions
-    process_positions = []
-    for process_name in ind_autoproducer_processes["TechName"].unique():
-        # Filter rows for this process
-        times_df_filtered = times_df[times_df["TechName"] == process_name]
+    years_columns = [
+        "2021",
+        "2024",
+        "2027",
+        "2030",
+        "2035",
+        "2040",
+        "2045",
+        "2050",
+        "2060",
+        "2070",
+    ]
 
-        if times_df_filtered.empty:
+    # ----------------------------------------------------------
+    # Process all processes that have a FLO_SHAR attribute.
+    # Use FLO_SHAR as a flag to determine which processes to handle.
+    flo_shar_process_positions = []
+    for process in times_df["TechName"].unique():
+        process_df = times_df[times_df["TechName"] == process]
+        if not process_df[process_df["Attribute"] == "FLO_SHAR"].empty:
+            start_index = process_df.index[0]
+            end_index = process_df.index[-1]
+            flo_shar_process_positions.append((start_index, end_index, process))
+    # Sorting in descending order (if index shifting were a concern)
+    flo_shar_process_positions.sort(reverse=True)
+
+    for start_index, end_index, process in flo_shar_process_positions:
+        process_subset = updated_times_df.iloc[start_index : end_index + 1]
+        input_rows = process_subset[process_subset["Attribute"] == "INPUT"]
+        act_eff_rows = process_subset[process_subset["Attribute"] == "ACT_EFF"]
+
+        if input_rows.empty or act_eff_rows.empty:
+            print(
+                f"Missing INPUT or ACT_EFF for process {process}, skipping FLO_SHAR-based calculation."
+            )
+            continue
+
+        # Use the first available rows
+        input_row = input_rows.iloc[0]
+        act_eff_row = act_eff_rows.iloc[0]
+        act_eff_index = act_eff_rows.index[0]
+
+        # Calculate new ACT_EFF values (ACT_EFF cell divided by INPUT cell for each year)
+        for year in years_columns:
+            try:
+                input_value = float(input_row[year])
+                act_eff_value = float(act_eff_row[year])
+                new_val = act_eff_value / input_value if input_value else ""
+            except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                new_val = ""
+            updated_times_df.loc[act_eff_index, year] = new_val
+
+    # --------------------------------------------------------------------------
+    # Now, process the two specific processes using the original logic.
+    # Here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_elec")
+    # divided by the first INPUT row's value.
+    specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]
+    specific_process_positions = []
+    for process_name in specific_processes:
+        process_df = times_df[times_df["TechName"] == process_name]
+        if process_df.empty:
             print(f"{process_name} was not found in times_df and hence was skipped")
             continue
+        start_index = process_df.index[0]
+        end_index = process_df.index[-1]
+        specific_process_positions.append((start_index, end_index, process_name))
+    specific_process_positions.sort(reverse=True)
 
-        # Get the index range for this process
-        process_indices = times_df_filtered.index
-        start_index = process_indices[0]
-        end_index = process_indices[-1]
+    for start_index, end_index, process_name in specific_process_positions:
+        process_subset = updated_times_df.iloc[start_index : end_index + 1]
 
-        # Add the process position to the list
-        process_positions.append((start_index, end_index, process_name))
-
-    # Sort process_positions in descending order to avoid index shift issues during insertion
-    process_positions.sort(reverse=True)
-
-    # Iterate over processes and calculate ACT_EFF
-    for start_index, end_index, process_name in process_positions:
-        # Filter rows for the current process
-        times_df_filtered = updated_times_df.iloc[start_index : end_index + 1]
-
-        # Find the first INPUT and OUTPUT rows
-        input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-        output_rows = times_df_filtered[times_df_filtered["Attribute"] == "OUTPUT"]
+        # Filter to get INPUT rows and the first OUTPUT row with Comm-OUT equal to "sec_elec".
+        input_rows = process_subset[process_subset["Attribute"] == "INPUT"]
+        output_rows = process_subset[
+            (process_subset["Attribute"] == "OUTPUT")
+            & (process_subset["Comm-OUT"] == "sec_elec")
+        ]
 
         if input_rows.empty or output_rows.empty:
-            print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
+            print(
+                f"Missing INPUT or OUTPUT for process {process_name}, skipping specific process calculation."
+            )
             continue
 
-        # Take the first INPUT and OUTPUT rows
         input_row = input_rows.iloc[0]
         output_row = output_rows.iloc[0]
 
-        # Calculate ACT_EFF for each year
+        # Calculate new ACT_EFF values as (output value)/(input value) for each year.
         act_eff_values = {}
-        years_columns = [
-            "2021",
-            "2024",
-            "2027",
-            "2030",
-            "2035",
-            "2040",
-            "2045",
-            "2050",
-            "2060",
-            "2070",
-        ]
         for year in years_columns:
             try:
                 input_value = float(input_row[year])
@@ -1220,26 +1322,24 @@ def calculate_act_eff(times_df):
             except (ValueError, ZeroDivisionError, KeyError, TypeError):
                 act_eff_values[year] = ""
 
-        # Create a new ACT_EFF row
-        new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
+        # Create a new row (with Attribute "EFF") for the calculated values.
+        new_row = {col: "" for col in times_df.columns}
         new_row["TechName"] = process_name
         new_row["Attribute"] = "EFF"
-
-        # Set the values for the years
         for year, value in act_eff_values.items():
             new_row[year] = value
 
-        # Insert the new row after the current process's rows
+        # Insert the new row immediately after the process's rows.
         updated_times_df = pd.concat(
             [
-                updated_times_df.iloc[: end_index + 1],  # Rows up to the process
-                pd.DataFrame([new_row]),  # The new ACT_EFF row
-                updated_times_df.iloc[end_index + 1 :],  # Rows after the process
+                updated_times_df.iloc[: end_index + 1],
+                pd.DataFrame([new_row]),
+                updated_times_df.iloc[end_index + 1 :],
             ],
             ignore_index=True,
         )
 
-        # Clear the year column values for all INPUT and OUTPUT rows
+        # Clear the year column values for the INPUT and OUTPUT rows.
         for index in input_rows.index:
             for year in years_columns:
                 updated_times_df.loc[index, year] = ""
@@ -1248,6 +1348,117 @@ def calculate_act_eff(times_df):
                 updated_times_df.loc[index, year] = ""
 
     return updated_times_df
+
+
+# def calculate_act_eff(times_df):
+#     """
+#     Calculates the ACT_EFF attribute for processes.
+#     Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
+#     divided by the first INPUT commodity value for each year.
+#     Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
+
+#     Parameters:
+#     times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
+
+#     Returns:
+#     pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
+#     """
+
+#     # Create a copy of the DataFrame to work with
+#     updated_times_df = times_df.copy()
+
+#     # Collect process positions
+#     process_positions = []
+#     for process_name in ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]:
+#         # Filter rows for this process
+#         times_df_filtered = times_df[times_df["TechName"] == process_name]
+
+#         if times_df_filtered.empty:
+#             print(f"{process_name} was not found in times_df and hence was skipped")
+#             continue
+
+#         # Get the index range for this process
+#         process_indices = times_df_filtered.index
+#         start_index = process_indices[0]
+#         end_index = process_indices[-1]
+
+#         # Add the process position to the list
+#         process_positions.append((start_index, end_index, process_name))
+
+#     # Sort process_positions in descending order to avoid index shift issues during insertion
+#     process_positions.sort(reverse=True)
+
+#     # Iterate over processes and calculate ACT_EFF
+#     for start_index, end_index, process_name in process_positions:
+#         # Filter rows for the current process
+#         times_df_filtered = updated_times_df.iloc[start_index : end_index + 1]
+
+#         # Find the first INPUT and OUTPUT rows
+#         input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
+#         output_rows = times_df_filtered[
+#             (times_df_filtered["Attribute"] == "OUTPUT")
+#             & (times_df_filtered["Comm-OUT"] == "sec_elec")
+#         ]
+
+#         if input_rows.empty or output_rows.empty:
+#             print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
+#             continue
+
+#         # Take the first INPUT and OUTPUT rows
+#         input_row = input_rows.iloc[0]
+#         output_row = output_rows.iloc[0]
+
+#         # Calculate ACT_EFF for each year
+#         act_eff_values = {}
+#         years_columns = [
+#             "2021",
+#             "2024",
+#             "2027",
+#             "2030",
+#             "2035",
+#             "2040",
+#             "2045",
+#             "2050",
+#             "2060",
+#             "2070",
+#         ]
+#         for year in years_columns:
+#             try:
+#                 input_value = float(input_row[year])
+#                 output_value = float(output_row[year])
+#                 act_eff = output_value / input_value if input_value else ""
+#                 act_eff_values[year] = act_eff
+#             except (ValueError, ZeroDivisionError, KeyError, TypeError):
+#                 act_eff_values[year] = ""
+
+#         # Create a new ACT_EFF row
+#         new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
+#         new_row["TechName"] = process_name
+#         new_row["Attribute"] = "EFF"
+
+#         # Set the values for the years
+#         for year, value in act_eff_values.items():
+#             new_row[year] = value
+
+#         # Insert the new row after the current process's rows
+#         updated_times_df = pd.concat(
+#             [
+#                 updated_times_df.iloc[: end_index + 1],  # Rows up to the process
+#                 pd.DataFrame([new_row]),  # The new ACT_EFF row
+#                 updated_times_df.iloc[end_index + 1 :],  # Rows after the process
+#             ],
+#             ignore_index=True,
+#         )
+
+#         # Clear the year column values for all INPUT and OUTPUT rows
+#         for index in input_rows.index:
+#             for year in years_columns:
+#                 updated_times_df.loc[index, year] = ""
+#         for index in output_rows.index:
+#             for year in years_columns:
+#                 updated_times_df.loc[index, year] = ""
+
+#     return updated_times_df
 
 
 # Paths and URLs
@@ -1291,6 +1502,6 @@ for process in x2x_processes:
 updated_df = calculate_act_eff(updated_df)
 # Save the updated DataFrame
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
-update_commodity_list_units(TIMES_FILE_PATH, units_mapping)
-update_process_list_sheet(TIMES_FILE_PATH, units_mapping)
+update_commodity_list_units(TIMES_FILE_PATH, updated_units_mapping)
+update_process_list_sheet(TIMES_FILE_PATH, updated_units_mapping)
 print("Excel file saved")
