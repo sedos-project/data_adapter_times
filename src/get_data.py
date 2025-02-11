@@ -954,14 +954,17 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                                 f"Source unit {source_unit} for {api_col} not found."
                                             )
                                             converted_value = api_value  # If no unit is found, use the value as is
-                                        if converted_value != 0:
-                                            times_df_filtered.at[
-                                                new_row_idx, str(year)
-                                            ] = (1 / converted_value)
-                                        else:
+                                        if (
+                                            converted_value is None
+                                            or converted_value == 0
+                                        ):
                                             times_df_filtered.at[
                                                 new_row_idx, str(year)
                                             ] = "ERR"
+                                        else:
+                                            times_df_filtered.at[
+                                                new_row_idx, str(year)
+                                            ] = (1 / converted_value)
                                         times_df_filtered.at[new_row_idx, "LimType"] = (
                                             constraint
                                         )
@@ -1057,13 +1060,16 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                                     f"Source unit {source_unit} for {api_col} not found."
                                                 )
                                                 converted_value = api_value  # If no unit is found, use the value as is
-                                            if converted_value != 0:
+                                            if (
+                                                converted_value is None
+                                                or converted_value == 0
+                                            ):
                                                 times_df_filtered.at[idx, str(year)] = (
-                                                    1 / converted_value
+                                                    "ERR"
                                                 )
                                             else:
                                                 times_df_filtered.at[idx, str(year)] = (
-                                                    "ERR"
+                                                    1 / converted_value
                                                 )
                                             times_df_filtered.at[idx, "LimType"] = (
                                                 constraint
