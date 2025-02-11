@@ -813,6 +813,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                 for idx in matching_row.index:
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
+                                    comm_grp = times_df_filtered.at[idx, "CommGrp"]
                                     if flow_share_commodity in (comm_in, comm_out):
                                         if current_combo not in pasted_combinations:
                                             pasted_combinations.add(current_combo)
@@ -856,6 +857,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                                 new_row["TechName"] = process_name
                                                 new_row["Comm-IN"] = comm_in
                                                 new_row["Comm-OUT"] = comm_out
+                                                new_row["CommGrp"] = comm_grp
                                                 new_row["Attribute"] = times_col
                                                 new_row["LimType"] = constraint
                                                 if api_value is not None:
@@ -869,6 +871,9 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                                 )
                                             else:
                                                 for idx in matching_row_new.index:
+                                                    times_df_filtered.at[
+                                                        idx, "CommGrp"
+                                                    ] = comm_grp
                                                     if api_value is not None:
                                                         times_df_filtered.at[
                                                             idx, str(year)
