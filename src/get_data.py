@@ -177,27 +177,37 @@ def format_and_save_excel(file_path, processed_df):
 
 def data_units(metadata):
     """
-    Converts the units of the fields in the API data according to the metadata.
+    Extracts unit information from metadata and updates the global set `all_unique_units`.
 
     Parameters:
-    api_data (pandas.DataFrame): The DataFrame containing the fetched API data.
     metadata (dict): The metadata containing information about the units.
 
     Returns:
-    pandas.DataFrame: The DataFrame with units converted to the standard units.
+    dict: A dictionary where keys are resource names and values are lists of field names and units.
     """
-    units_dict = {}  # Initialize an empty dictionary to store units
+    units_dict = {}
 
     if not metadata:
-        return units_dict  # Return as is if no data or metadata is present
+        return units_dict
 
     for resource in metadata.get("resources", []):
+        resource_name = resource.get("name", "").replace(
+            "model_draft.", ""
+        )  # Remove "model_draft." prefix
         fields = resource.get("schema", {}).get("fields", [])
+
+        # Initialize the list for each resource if it doesn't exist
+        if resource_name not in units_dict:
+            units_dict[resource_name] = []
+
+        # Append each field and its unit as a dictionary to the resource's list
         for field in fields:
             field_name = field["name"]
             field_unit = field.get("unit")
             if field_name and field_unit:
-                units_dict[field_name] = field_unit  # Store the field_name and unit
+                units_dict[resource_name].append(
+                    {"field_name": field_name, "unit": field_unit}
+                )
 
     return units_dict
 
@@ -216,48 +226,58 @@ def update_commodity_list_units(excel_file_path, units_mapping):
         print("Commodity List sheet not found in the Excel file.")
         return
 
-    # Get header row
-    header_row = None
-    for row in ws.iter_rows(min_row=1, max_row=10, values_only=False):
-        for cell in row:
-            if cell.value == "CommName":
-                header_row = cell.row
-                break
-        if header_row is not None:
-            break
-
+    header_row = find_header_row(ws, "CommName")
     if header_row is None:
         print("CommName header not found in Commodity List sheet.")
         return
 
     # Get column indices for CommName and Unit
     headers = {cell.value: cell.column for cell in ws[header_row]}
-    if "CommName" in headers and "Unit" in headers:
+    if "CommName" in headers and "Unit" in headers and "Ctype" in headers:
         commname_col = headers["CommName"]
         unit_col = headers["Unit"]
+        ctype_col = headers["Ctype"]
     else:
-        print("CommName or Unit column not found in Commodity List sheet.")
+        print("CommName or Unit or Ctype column not found in Commodity List sheet.")
         return
 
-    # For each field_name and field_unit in units_mapping
-    for field_name, field_unit in units_mapping.items():
-        # Only process field names starting with 'conversion_factor_'
-        if field_name.startswith("conversion_factor_"):
-            # Remove the 'conversion_factor_' prefix directly
-            comm_name = field_name[len("conversion_factor_") :]
-            found = False
-            for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
-                commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
-                if commname_cell.value and isinstance(commname_cell.value, str):
-                    if commname_cell.value.strip().lower() == comm_name.strip().lower():
-                        unit_cell = row[unit_col - 1]
-                        unit_cell.value = field_unit
-                        found = True
-                        break  # Assuming CommName is unique
-            if not found:
-                print(
-                    f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
-                )
+    # Loop over each resource in units_mapping
+    for resource_name, fields in units_mapping.items():
+        for field in fields:
+            field_name = field["field_name"]
+            field_unit = field["unit"]
+            # Only process field names starting with 'conversion_factor_'
+            if field_name.startswith("conversion_factor_"):
+                # Remove the 'conversion_factor_' prefix directly
+                comm_name = field_name[len("conversion_factor_") :]
+                found = False
+                for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
+                    commname_cell = row[
+                        commname_col - 1
+                    ]  # openpyxl columns are 1-based
+                    if commname_cell.value and isinstance(commname_cell.value, str):
+                        commname = commname_cell.value.strip().lower()
+                        # Check if "_elec_" or other boundary conditions exist
+                        if (
+                            "_elec_" in commname
+                            or commname.startswith("elec_")
+                            or commname.endswith("_elec")
+                            or commname == "elec"
+                        ):
+                            ctype_cell = row[ctype_col - 1]
+                            ctype_cell.value = "ELC"
+                        if (
+                            commname_cell.value.strip().lower()
+                            == comm_name.strip().lower()
+                        ):
+                            unit_cell = row[unit_col - 1]
+                            unit_cell.value = field_unit
+                            found = True
+                            break  # Assuming CommName is unique
+                if not found:
+                    print(
+                        f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
+                    )
 
     # Save the workbook
     wb.save(excel_file_path)
@@ -288,12 +308,13 @@ def update_process_list_sheet(excel_file_path, units_mapping):
     vintage_col = headers.get("Vintage")
     primary_cg_col = headers.get("PrimaryCG")
     tact_col = headers.get("Tact")
+    tcap_col = headers.get("Tcap")
 
-    if not (techname_col and vintage_col and primary_cg_col and tact_col):
+    if not (techname_col and vintage_col and primary_cg_col and tact_col and tcap_col):
         print("Some required columns are missing in 'Process List' sheet.")
         return
 
-    # Set Vintage column to 'NO' and populate PrimaryCG and Tact
+    # Set Vintage column to 'NO' and populate PrimaryCG, Tact, and TCap
     for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
         techname_cell = row[techname_col - 1]
         if techname_cell.value:
@@ -314,16 +335,26 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             )
 
             if output_commodity.size > 0:  # Check if array is not empty
-                if "_autoproducer_" in process_name:
+                if "_chp_" in process_name:
                     primary_cg = "NRGO"
                 else:
                     primary_cg = output_commodity[0]
-                # row[primary_cg_col - 1].value = primary_cg
+
+                row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = units_mapping.get(
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
+            else:
+                if "_chp_" in process_name:
+                    primary_cg = "NRGO"
+                else:
+                    primary_cg = "notFound"
+                row[primary_cg_col - 1].value = primary_cg
+
+                # Set Tact to the unit from Commodity List
+                row[tact_col - 1].value = "notFound"
 
     # Save the workbook
     wb.save(excel_file_path)
@@ -421,7 +452,11 @@ def data_mapping(times_df, process_name, is_group=False):
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
 
+    # Fetch metadata
+    metadata = fetch_process_metadata(process_name)
+
     if is_group:
+        grp_name = process_name
         # Divide the data based on the 'type' column
         process_groups = api_process_data.groupby("type")
 
@@ -436,7 +471,7 @@ def data_mapping(times_df, process_name, is_group=False):
 
             handled_processes.append(process)
             times_df = data_mapping_internal(
-                times_df, process, group_data
+                times_df, process, group_data, metadata, grp_name
             )  # Call internal function for each process
             process_count += 1  # Increment the counter for each handled process
 
@@ -445,13 +480,12 @@ def data_mapping(times_df, process_name, is_group=False):
         )
         return times_df
     else:
-        return data_mapping_internal(times_df, process_name, api_process_data)
+        return data_mapping_internal(
+            times_df, process_name, api_process_data, metadata, grp_name="default"
+        )
 
 
-def data_mapping_internal(times_df, process_name, api_process_data):
-
-    # Fetch metadata
-    metadata = fetch_process_metadata(process_name)
+def data_mapping_internal(times_df, process_name, api_process_data, metadata, grp_name):
 
     # Update units_mapping
     global units_mapping
@@ -608,7 +642,7 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         )
                         elif (
                             "availability_constant" in sedos_item
-                            or "availability_timeseries_fixed" in sedos_item
+                            or "efficiency_sto_in" in sedos_item
                         ):
                             # Handle availability constants or time series fixed
                             matching_row = times_df_filtered[
@@ -642,6 +676,12 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                         times_df_filtered.at[idx, "LimType"] = (
                                             constraint
                                         )
+                        elif (
+                            "availability_timeseries_fixed" in sedos_item
+                            or "availability_timeseries_max" in sedos_item
+                        ):
+                            # temporary fix
+                            continue
                         else:
                             # Check if only the Attribute matches
                             matching_row = times_df_filtered[
@@ -693,7 +733,11 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     # Implement CAP2ACT logic
     cap2act_value = 1  # Default to empty if no match is found
 
-    if process_name.endswith("_1"):
+    if "storage" in process_name.lower():
+        cap2act_value = (
+            0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
+        )
+    elif process_name.endswith("_1"):
         # Check if 'cost_inv_p' exists in the API process data columns
         if "cost_inv_p" in api_process_data.columns:
             cap2act_value = 31.536
