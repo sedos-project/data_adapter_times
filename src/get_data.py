@@ -507,11 +507,13 @@ def data_mapping(times_df, process_name, is_group=False):
             # Remove columns where all values are NaN (i.e., columns without any data)
             group_data = group_data.dropna(axis=1, how="all")
 
-            handled_processes.append(process)
-            times_df = data_mapping_internal(
-                times_df, process, group_data, metadata, grp_name
-            )  # Call internal function for each process
-            process_count += 1  # Increment the counter for each handled process
+            # Only process if not already handled
+            if process not in handled_processes:
+                handled_processes.add(process)
+                times_df = data_mapping_internal(
+                    times_df, process, group_data, metadata, grp_name
+                )  # Call internal function for each process
+                process_count += 1  # Increment the counter for each handled process
 
         print(
             f"{process_count} processes were handled inside the process group: {process_name}"
@@ -1126,14 +1128,14 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
     # Implement CAP2ACT logic
     cap2act_value = 1  # Default to empty if no match is found
 
-    if process_name.endswith("_1"):
-        # Check if 'cost_inv_p' exists in the API process data columns
-        if "cost_inv_p" in api_process_data.columns:
-            cap2act_value = 31.536
-    elif "storage" in process_name.lower():
+    if "storage" in process_name.lower():
         cap2act_value = (
             0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
         )
+    elif process_name.endswith("_1"):
+        # Check if 'cost_inv_p' exists in the API process data columns
+        if "cost_inv_p" in api_process_data.columns:
+            cap2act_value = 31.536
     elif process_name.endswith("_0"):
         # Check if 'capacity_p_inst_0' exists in the API process data columns
         if "capacity_p_inst_0" in api_process_data.columns:
@@ -1313,7 +1315,7 @@ process_groups = pg["process_group"].tolist()
 desired_units_mapping = load_desired_units_mapping()
 
 # Define a global list to keep track of processes that have been handled
-handled_processes = []
+handled_processes = set()
 
 # Handle pre-defined process groups first
 for process_group in process_groups:
@@ -1327,10 +1329,12 @@ pow_processes = [process for process in unique_processes if "pow_" in process.lo
 pow_processes = [process for process in pow_processes if not process.endswith("_ag")]
 
 for process in pow_processes:
-    if process not in handled_processes:
-        updated_df = data_mapping(
-            updated_df, process
-        )  # Perform data mapping and update updated_df
+    if process in handled_processes:
+        print(f"Process {process} already handled in process group, skipping.")
+        continue
+    updated_df = data_mapping(
+        updated_df, process
+    )  # Perform data mapping and update updated_df
 
 # Apply ACT_EFF calculation
 updated_df = calculate_act_eff(updated_df)
