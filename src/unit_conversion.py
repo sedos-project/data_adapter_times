@@ -147,6 +147,7 @@ def define_energy_model_units():
 
     NamedComposedUnit("€/MW", unit("EUR") / unit("MW"))
 
+    NamedComposedUnit("EUR/(MW*a)", unit("EUR") / (unit("MW") * unit("a")))
     NamedComposedUnit("EUR/MW*a", unit("EUR") / (unit("MW") * unit("a")))
     NamedComposedUnit("€/MW*a", unit("EUR") / (unit("MW") * unit("a")))
     NamedComposedUnit("EUR/MW/a", unit("EUR") / unit("MW") / unit("a"))

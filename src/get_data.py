@@ -389,11 +389,18 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = output_commodity[0]
 
                 row[primary_cg_col - 1].value = primary_cg
+                primary_cg_temp = output_commodity[0]
 
-                # Set Tact to the unit from Commodity List based on the conversion factor
-                row[tact_col - 1].value = units_mapping.get(
-                    f"conversion_factor_{primary_cg}", "notFound"
-                )
+                # Find the Tact unit by searching the resource in units_mapping
+                for resource_name, fields in units_mapping.items():
+                    for field in fields:
+                        if (
+                            field["field_name"] == f"conversion_factor_{primary_cg}"
+                            or field["field_name"]
+                            == f"conversion_factor_{primary_cg_temp}"
+                        ):
+                            if field["unit"]:
+                                row[tact_col - 1].value = field["unit"]
             else:
                 if process_name in ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]:
                     primary_cg = "NRGO"
@@ -549,11 +556,13 @@ def data_mapping(times_df, process_name, is_group=False):
             # Remove columns where all values are NaN (i.e., columns without any data)
             group_data = group_data.dropna(axis=1, how="all")
 
-            handled_processes.append(process)
-            times_df = data_mapping_internal(
-                times_df, process, group_data, metadata, grp_name
-            )  # Call internal function for each process
-            process_count += 1  # Increment the counter for each handled process
+            # Only process if not already handled
+            if process not in handled_processes:
+                handled_processes.add(process)
+                times_df = data_mapping_internal(
+                    times_df, process, group_data, metadata, grp_name
+                )  # Call internal function for each process
+                process_count += 1  # Increment the counter for each handled process
 
         print(
             f"{process_count} processes were handled inside the process group: {process_name}"
@@ -1281,6 +1290,11 @@ def calculate_act_eff(times_df):
                 new_val = ""
             updated_times_df.loc[act_eff_index, year] = new_val
 
+        # Clear the year column values for the INPUT and OUTPUT rows.
+        for index in input_rows.index:
+            for year in years_columns:
+                updated_times_df.loc[index, year] = ""
+
     # --------------------------------------------------------------------------
     # Now, process the two specific processes using the original logic.
     # Here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_elec")
@@ -1355,117 +1369,6 @@ def calculate_act_eff(times_df):
     return updated_times_df
 
 
-# def calculate_act_eff(times_df):
-#     """
-#     Calculates the ACT_EFF attribute for processes.
-#     Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
-#     divided by the first INPUT commodity value for each year.
-#     Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
-
-#     Parameters:
-#     times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
-
-#     Returns:
-#     pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
-#     """
-
-#     # Create a copy of the DataFrame to work with
-#     updated_times_df = times_df.copy()
-
-#     # Collect process positions
-#     process_positions = []
-#     for process_name in ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]:
-#         # Filter rows for this process
-#         times_df_filtered = times_df[times_df["TechName"] == process_name]
-
-#         if times_df_filtered.empty:
-#             print(f"{process_name} was not found in times_df and hence was skipped")
-#             continue
-
-#         # Get the index range for this process
-#         process_indices = times_df_filtered.index
-#         start_index = process_indices[0]
-#         end_index = process_indices[-1]
-
-#         # Add the process position to the list
-#         process_positions.append((start_index, end_index, process_name))
-
-#     # Sort process_positions in descending order to avoid index shift issues during insertion
-#     process_positions.sort(reverse=True)
-
-#     # Iterate over processes and calculate ACT_EFF
-#     for start_index, end_index, process_name in process_positions:
-#         # Filter rows for the current process
-#         times_df_filtered = updated_times_df.iloc[start_index : end_index + 1]
-
-#         # Find the first INPUT and OUTPUT rows
-#         input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-#         output_rows = times_df_filtered[
-#             (times_df_filtered["Attribute"] == "OUTPUT")
-#             & (times_df_filtered["Comm-OUT"] == "sec_elec")
-#         ]
-
-#         if input_rows.empty or output_rows.empty:
-#             print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
-#             continue
-
-#         # Take the first INPUT and OUTPUT rows
-#         input_row = input_rows.iloc[0]
-#         output_row = output_rows.iloc[0]
-
-#         # Calculate ACT_EFF for each year
-#         act_eff_values = {}
-#         years_columns = [
-#             "2021",
-#             "2024",
-#             "2027",
-#             "2030",
-#             "2035",
-#             "2040",
-#             "2045",
-#             "2050",
-#             "2060",
-#             "2070",
-#         ]
-#         for year in years_columns:
-#             try:
-#                 input_value = float(input_row[year])
-#                 output_value = float(output_row[year])
-#                 act_eff = output_value / input_value if input_value else ""
-#                 act_eff_values[year] = act_eff
-#             except (ValueError, ZeroDivisionError, KeyError, TypeError):
-#                 act_eff_values[year] = ""
-
-#         # Create a new ACT_EFF row
-#         new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
-#         new_row["TechName"] = process_name
-#         new_row["Attribute"] = "EFF"
-
-#         # Set the values for the years
-#         for year, value in act_eff_values.items():
-#             new_row[year] = value
-
-#         # Insert the new row after the current process's rows
-#         updated_times_df = pd.concat(
-#             [
-#                 updated_times_df.iloc[: end_index + 1],  # Rows up to the process
-#                 pd.DataFrame([new_row]),  # The new ACT_EFF row
-#                 updated_times_df.iloc[end_index + 1 :],  # Rows after the process
-#             ],
-#             ignore_index=True,
-#         )
-
-#         # Clear the year column values for all INPUT and OUTPUT rows
-#         for index in input_rows.index:
-#             for year in years_columns:
-#                 updated_times_df.loc[index, year] = ""
-#         for index in output_rows.index:
-#             for year in years_columns:
-#                 updated_times_df.loc[index, year] = ""
-
-#     return updated_times_df
-
-
 # Paths and URLs
 TIMES_FILE_PATH = "output_data/vt_DE_x2x.xlsx"
 
@@ -1484,7 +1387,7 @@ process_groups = [
 desired_units_mapping = load_desired_units_mapping()
 
 # Define a global list to keep track of processes that have been handled
-handled_processes = []
+handled_processes = set()
 
 # Handle pre-defined process groups first
 for process_group in process_groups:
@@ -1498,10 +1401,12 @@ x2x_processes = [process for process in unique_processes if process.startswith("
 x2x_processes = [process for process in x2x_processes if not process.endswith("_ag")]
 
 for process in x2x_processes:
-    if process not in handled_processes:
-        updated_df = data_mapping(
-            updated_df, process
-        )  # Perform data mapping and update updated_df
+    if process in handled_processes:
+        print(f"Process {process} already handled in process group, skipping.")
+        continue
+    updated_df = data_mapping(
+        updated_df, process
+    )  # Perform data mapping and update updated_df
 
 # Apply ACT_EFF calculation
 updated_df = calculate_act_eff(updated_df)
