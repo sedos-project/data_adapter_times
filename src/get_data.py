@@ -206,13 +206,13 @@ def format_and_save_excel(file_path, processed_df):
 
 def data_units(metadata):
     """
-    Extracts unit information from metadata and updates the global set `all_unique_units`.
+    Converts the units of the fields in the API data according to the metadata.
 
     Parameters:
     metadata (dict): The metadata containing information about the units.
 
     Returns:
-    dict: A dictionary where keys are resource names and values are lists of field names and units.
+    dict: A dictionary where the keys are resource names and the values are lists of field names and units.
     """
     units_dict = {}
 
@@ -379,11 +379,20 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = output_commodity[0]
 
                 row[primary_cg_col - 1].value = primary_cg
+                primary_cg_temp = output_commodity[0]
 
-                # Set Tact to the unit from Commodity List
-                row[tact_col - 1].value = units_mapping.get(
-                    f"conversion_factor_{primary_cg}", "notFound"
-                )
+                # Find the Tact unit by searching the resource in units_mapping
+                for resource_name, fields in units_mapping.items():
+                    for field in fields:
+                        if (
+                            field["field_name"] == f"conversion_factor_{primary_cg}"
+                            or field["field_name"]
+                            == f"conversion_factor_{primary_cg_temp}"
+                        ):
+                            if field["unit"]:
+                                row[tact_col - 1].value = field["unit"]
+                            else:
+                                row[tact_col - 1].value = "notFound"
             else:
                 if "_chp_" in process_name:
                     primary_cg = "NRGO"
@@ -393,6 +402,12 @@ def update_process_list_sheet(excel_file_path, units_mapping):
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = "notFound"
+
+    # Additional check: Ensure that every cell in the Tact column has a value
+    for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
+        tact_cell = row[tact_col - 1]
+        if tact_cell.value is None or tact_cell.value == "":
+            tact_cell.value = "notFound"
 
     # Save the workbook
     wb.save(excel_file_path)
