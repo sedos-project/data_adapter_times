@@ -421,6 +421,12 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = "notFound"
 
+    # Additional check: Ensure that every cell in the Tact column has a value
+    for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
+        tact_cell = row[tact_col - 1]
+        if tact_cell.value is None or tact_cell.value == "":
+            tact_cell.value = "notFound"
+
     # Save the workbook
     wb.save(excel_file_path)
     print("Process List sheet updated with Vintage, PrimaryCG, and Tact columns.")
