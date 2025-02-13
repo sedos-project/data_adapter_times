@@ -12,7 +12,7 @@ updated_units_mapping = {}
 desired_units_mapping = {}
 
 
-def load_desired_units_mapping(file_path="config_data/units_mapping_x2x.xlsx"):
+def load_desired_units_mapping(file_path="config_data/units_mapping_helper.xlsx"):
     """
     Loads the source-desired unit pairs from the 'Unique Units' sheet into a dictionary.
 
@@ -1370,10 +1370,10 @@ def calculate_act_eff(times_df):
 
 
 # Paths and URLs
-TIMES_FILE_PATH = "output_data/vt_DE_x2x.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_helper.xlsx"
 
 # Read the pickle file and print the DataFrame
-PICKLE_FILE_PATH = "output_data/times_df_x2x.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_helper.pkl"
 times_df = pd.read_pickle(PICKLE_FILE_PATH)
 
 # Create a copy of times_df to work with
@@ -1393,20 +1393,20 @@ handled_processes = set()
 for process_group in process_groups:
     updated_df = data_mapping(updated_df, process_group, is_group=True)
 
-# Fetch and process data for each unique process in the TechName column that starts with 'x2x'
+# Fetch and process data for each unique process in the TechName column that starts with 'helper_'
 unique_processes = times_df["TechName"].unique()
-x2x_processes = [process for process in unique_processes if process.startswith("x2x")]
+helper_processes = [
+    process
+    for process in unique_processes
+    if process.startswith("helper_") and not process.startswith("helper_sink_")
+]
 
-# Skip processes that end with '_ag'
-x2x_processes = [process for process in x2x_processes if not process.endswith("_ag")]
-
-for process in x2x_processes:
+# Iterate over the filtered helper processes
+for process in helper_processes:
     if process in handled_processes:
         print(f"Process {process} already handled in process group, skipping.")
         continue
-    updated_df = data_mapping(
-        updated_df, process
-    )  # Perform data mapping and update updated_df
+    updated_df = data_mapping(updated_df, process)
 
 # Apply ACT_EFF calculation
 updated_df = calculate_act_eff(updated_df)

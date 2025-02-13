@@ -25,9 +25,9 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
     remove_pattern = re.compile(r"\b(pri_|sec_|iip_|exo_|emi_)")
 
     for _, row in original_df.iterrows():
-        process = row.get("process", None)
-        if process is None or not process.lower().startswith("x2x"):
-            continue  # Skip this row if the process does not start with 'x2x'
+        process = str(row.get("process", "")).lower()
+        if not process.startswith("helper_") or process.startswith("helper_sink_"):
+            continue  # Skip this row if the process does not meet the criteria
 
         if process.endswith("_ag"):
             continue  # Skip this row if the process ends with 'ag'
@@ -573,7 +573,7 @@ def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Load the original DataFrame
-SEDOS_FILE = pd.read_excel("input_data/Modellstruktur.xlsx", sheet_name="Process_Set")
+SEDOS_FILE = pd.read_excel("input_data/Modellstruktur.xlsx", sheet_name="Helper_Set")
 
 # Process the data
 times_df, commodity_groups = process_data(SEDOS_FILE)
@@ -583,7 +583,7 @@ print(times_df)
 times_df_filtered = filter_output_with_emi_commodities(times_df)
 
 # Define the path for the pickle file
-PICKLE_FILE_PATH = "output_data/times_df_x2x.pkl"
+PICKLE_FILE_PATH = "output_data/times_df_helper.pkl"
 
 # Save the filtered times_df DataFrame as a pickle file
 times_df_filtered.to_pickle(PICKLE_FILE_PATH)
@@ -596,7 +596,7 @@ update_commodity_groups(SYS_SETTINGS_PATH, commodity_groups)
 print(f"Updated Commodity Groups in: {SYS_SETTINGS_PATH}")
 
 # Format and save the Excel file
-TIMES_FILE_PATH = "output_data/vt_DE_x2x.xlsx"
+TIMES_FILE_PATH = "output_data/vt_DE_helper.xlsx"
 create_blank_excel(TIMES_FILE_PATH)
 add_comm_sheet_to_workbook(TIMES_FILE_PATH, times_df)
 add_process_sheet_to_workbook(TIMES_FILE_PATH, times_df)
