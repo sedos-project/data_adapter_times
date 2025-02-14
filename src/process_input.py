@@ -553,7 +553,7 @@ def create_blank_excel(file_path):
 def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
     """
     Filters out rows from the DataFrame where the Attribute is 'OUTPUT'
-    and the Comm-OUT starts with 'emi_', except for 'emi_co2_neg_air_dacc'.
+    and the Comm-OUT starts with 'emi_', except for 'emi_co2_neg_air_dacc', 'emi_co2_reusable', 'emi_co2_stored'.
 
     Args:
         df (pd.DataFrame): The original DataFrame.
@@ -566,6 +566,8 @@ def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
             (df["Attribute"] == "OUTPUT")
             & df["Comm-OUT"].str.startswith("emi_")
             & (df["Comm-OUT"] != "emi_co2_neg_air_dacc")
+            & (df["Comm-OUT"] != "emi_co2_stored")
+            & (df["Comm-OUT"] != "emi_co2_reusable")
         )
     ].copy()
 
