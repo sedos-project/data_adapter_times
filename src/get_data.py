@@ -507,6 +507,7 @@ def data_mapping(times_df, process_name, is_group=False):
 
     # Fetch metadata
     metadata = fetch_process_metadata(process_name)
+    allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_")
 
     if is_group:
         grp_name = process_name
@@ -516,7 +517,9 @@ def data_mapping(times_df, process_name, is_group=False):
         process_count = 0  # Initialize a counter for the processes handled
 
         for process, group_data in process_groups:
-            if process.endswith("_ag"):  # Skip processes ending with _ag
+            if process.endswith("_ag") and not process.startswith(
+                allowed_prefixes_for_ag
+            ):  # Skip processes ending with _ag but not those starting with the allowed prefixes
                 continue
 
             # Remove columns where all values are NaN (i.e., columns without any data)
@@ -898,7 +901,8 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                         else:
                             # Check if only the Attribute matches
                             matching_row = times_df_filtered[
-                                times_df_filtered["Attribute"] == times_col
+                                (times_df_filtered["Attribute"] == times_col)
+                                | (times_df_filtered["Attribute"] == "CAP_BND")
                             ]
                             # Fetch unit from units_mapping by matching resource_name to process_name
                             source_unit = None
@@ -922,14 +926,22 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                     {col: pd.NA for col in times_df_filtered.columns}
                                 )
                                 new_row["TechName"] = process_name
-                                new_row["Attribute"] = times_col
-                                new_row["LimType"] = constraint
+                                if (
+                                    "shared_potential_id" in api_process_data.columns
+                                    and "capacity_p_max" in api_col
+                                ):
+                                    new_row["Attribute"] = "CAP_BND"
+                                    new_row["LimType"] = "UP"
+                                else:
+                                    new_row["Attribute"] = times_col
+                                    new_row["LimType"] = constraint
                                 times_df_filtered = pd.concat(
                                     [times_df_filtered, new_row.to_frame().T],
                                     ignore_index=True,
                                 )
                                 new_row_idx = times_df_filtered[
-                                    times_df_filtered["Attribute"] == times_col
+                                    (times_df_filtered["Attribute"] == times_col)
+                                    | (times_df_filtered["Attribute"] == "CAP_BND")
                                 ].index[-1]
                                 if api_value is not None:
                                     # If the sedos_item contains 'cb_coefficient', apply 1/api_value
@@ -1147,11 +1159,11 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
         cap2act_value = (
             0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
         )
-    elif process_name.endswith("_1"):
+    elif "_1" in process_name.lower():
         # Check if 'cost_inv_p' exists in the API process data columns
         if "cost_inv_p" in api_process_data.columns:
             cap2act_value = 31.536
-    elif process_name.endswith("_0"):
+    elif "_0" in process_name.lower():
         # Check if 'capacity_p_inst_0' exists in the API process data columns
         if "capacity_p_inst_0" in api_process_data.columns:
             cap2act_value = 31.536
@@ -1198,114 +1210,177 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
 
 def calculate_act_eff(times_df):
     """
-    Calculates the ACT_EFF attribute for processes starting with 'ind_autoproducer'.
-    Adds a new ACT_EFF row for each such process, calculating values as the first OUTPUT commodity value
-    divided by the first INPUT commodity value for each year.
-    Clears the INPUT and OUTPUT rows used in the calculation by setting their year column values to empty.
+    Calculates the ACT_EFF attribute for processes.
+
+    For processes with TechName containing 'chp':
+      - A new ACT_EFF (attribute "EFF") row is created.
+      - The new row’s yearly values are calculated as the first OUTPUT value divided
+        by the first INPUT value for each year.
+      - The year values in the INPUT and OUTPUT rows used are then cleared.
+
+    For processes with TechName containing 'FLO_SHAR':
+      - The first INPUT and the first ACT_EFF (attribute "EFF") rows in the process are used.
+      - The existing ACT_EFF row is updated so that each year’s value becomes:
+            ACT_EFF_value / INPUT_value
+      - The year values in the INPUT row (and any OUTPUT row, if present) are then cleared.
 
     Parameters:
-    times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
+        times_df (pandas.DataFrame): The DataFrame containing the TIMES data.
 
     Returns:
-    pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
+        pandas.DataFrame: The updated DataFrame with the ACT_EFF attributes calculated.
     """
-    # Filter processes that start with 'ind_autoproducer'
-    pow_autoproducer_processes = times_df[times_df["TechName"].str.contains("chp")]
-
-    if pow_autoproducer_processes.empty:
-        print("No processes starting with 'chp' found.")
-        return times_df
 
     # Create a copy of the DataFrame to work with
     updated_times_df = times_df.copy()
 
-    # Collect process positions
-    process_positions = []
-    for process_name in pow_autoproducer_processes["TechName"].unique():
-        # Filter rows for this process
-        times_df_filtered = times_df[times_df["TechName"] == process_name]
+    # Define the year columns once to use in both processing sections
+    years_columns = [
+        "2021",
+        "2024",
+        "2027",
+        "2030",
+        "2035",
+        "2040",
+        "2045",
+        "2050",
+        "2060",
+        "2070",
+    ]
 
-        if times_df_filtered.empty:
-            print(f"{process_name} was not found in times_df and hence was skipped")
-            continue
+    # ------------------------------
+    # Process "chp" Processes
+    # ------------------------------
+    chp_processes = updated_times_df[updated_times_df["TechName"].str.contains("chp")]
+    if chp_processes.empty:
+        print("No processes starting with 'chp' found.")
+    else:
+        process_positions = []
+        for process_name in chp_processes["TechName"].unique():
+            times_df_filtered = updated_times_df[
+                updated_times_df["TechName"] == process_name
+            ]
+            if times_df_filtered.empty:
+                print(f"{process_name} was not found in times_df and hence was skipped")
+                continue
+            process_indices = times_df_filtered.index
+            start_index = process_indices[0]
+            end_index = process_indices[-1]
+            process_positions.append((start_index, end_index, process_name))
 
-        # Get the index range for this process
-        process_indices = times_df_filtered.index
-        start_index = process_indices[0]
-        end_index = process_indices[-1]
+        # Sort in descending order to avoid index shift issues during insertion
+        process_positions.sort(reverse=True)
 
-        # Add the process position to the list
-        process_positions.append((start_index, end_index, process_name))
+        for start_index, end_index, process_name in process_positions:
+            process_slice = updated_times_df.iloc[start_index : end_index + 1]
+            input_rows = process_slice[process_slice["Attribute"] == "INPUT"]
+            output_rows = process_slice[process_slice["Attribute"] == "OUTPUT"]
 
-    # Sort process_positions in descending order to avoid index shift issues during insertion
-    process_positions.sort(reverse=True)
+            if input_rows.empty or output_rows.empty:
+                print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
+                continue
 
-    # Iterate over processes and calculate ACT_EFF
-    for start_index, end_index, process_name in process_positions:
-        # Filter rows for the current process
-        times_df_filtered = updated_times_df.iloc[start_index : end_index + 1]
+            input_row = input_rows.iloc[0]
+            output_row = output_rows.iloc[0]
 
-        # Find the first INPUT and OUTPUT rows
-        input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-        output_rows = times_df_filtered[times_df_filtered["Attribute"] == "OUTPUT"]
-
-        if input_rows.empty or output_rows.empty:
-            print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
-            continue
-
-        # Take the first INPUT and OUTPUT rows
-        input_row = input_rows.iloc[0]
-        output_row = output_rows.iloc[0]
-
-        # Calculate ACT_EFF for each year
-        act_eff_values = {}
-        years_columns = [
-            "2021",
-            "2024",
-            "2027",
-            "2030",
-            "2035",
-            "2040",
-            "2045",
-            "2050",
-            "2060",
-            "2070",
-        ]
-        for year in years_columns:
-            try:
-                input_value = float(input_row[year])
-                output_value = float(output_row[year])
-                act_eff = output_value / input_value if input_value else ""
-                act_eff_values[year] = act_eff
-            except (ValueError, ZeroDivisionError, KeyError, TypeError):
-                act_eff_values[year] = ""
-
-        # Create a new ACT_EFF row
-        new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
-        new_row["TechName"] = process_name
-        new_row["Attribute"] = "EFF"
-
-        # Set the values for the years
-        for year, value in act_eff_values.items():
-            new_row[year] = value
-
-        # Insert the new row after the current process's rows
-        updated_times_df = pd.concat(
-            [
-                updated_times_df.iloc[: end_index + 1],  # Rows up to the process
-                pd.DataFrame([new_row]),  # The new ACT_EFF row
-                updated_times_df.iloc[end_index + 1 :],  # Rows after the process
-            ],
-            ignore_index=True,
-        )
-
-        # Clear the year column values for all INPUT and OUTPUT rows
-        for index in input_rows.index:
+            # Calculate ACT_EFF for each year
+            act_eff_values = {}
             for year in years_columns:
-                updated_times_df.loc[index, year] = ""
-        for index in output_rows.index:
+                try:
+                    input_value = float(input_row[year])
+                    output_value = float(output_row[year])
+                    act_eff_values[year] = (
+                        output_value / input_value if input_value else ""
+                    )
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    act_eff_values[year] = ""
+
+            # Create a new ACT_EFF row
+            new_row = {col: "" for col in updated_times_df.columns}
+            new_row["TechName"] = process_name
+            new_row["Attribute"] = "EFF"
+            for year, value in act_eff_values.items():
+                new_row[year] = value
+
+            # Insert the new ACT_EFF row after the process's rows
+            updated_times_df = pd.concat(
+                [
+                    updated_times_df.iloc[: end_index + 1],  # Rows up to the process
+                    pd.DataFrame([new_row]),  # The new ACT_EFF row
+                    updated_times_df.iloc[end_index + 1 :],  # Rows after the process
+                ],
+                ignore_index=True,
+            )
+
+            # Clear the year column values for all INPUT and OUTPUT rows
+            for idx in input_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[idx, year] = ""
+            for idx in output_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[idx, year] = ""
+
+    # ------------------------------
+    # Process "FLO_SHAR" Processes
+    # ------------------------------
+    flo_shar_processes = updated_times_df[
+        updated_times_df["Attribute"].str.contains("FLO_SHAR")
+    ]
+    if flo_shar_processes.empty:
+        print("No processes containing 'FLO_SHAR' found.")
+    else:
+        flo_shar_positions = []
+        for process_name in flo_shar_processes["TechName"].unique():
+            times_df_filtered = updated_times_df[
+                updated_times_df["TechName"] == process_name
+            ]
+            if times_df_filtered.empty:
+                print(f"{process_name} was not found and hence was skipped")
+                continue
+            process_indices = times_df_filtered.index
+            start_index = process_indices[0]
+            end_index = process_indices[-1]
+            flo_shar_positions.append((start_index, end_index, process_name))
+
+        # Sort in descending order to avoid index shifts during updates
+        flo_shar_positions.sort(reverse=True)
+
+        for start_index, end_index, process_name in flo_shar_positions:
+            process_slice = updated_times_df.iloc[start_index : end_index + 1]
+            output_rows = process_slice[process_slice["Attribute"] == "OUTPUT"]
+            # The ACT_EFF row is assumed to have Attribute "ACT_EFF"
+            acteff_rows = process_slice[process_slice["Attribute"] == "ACT_EFF"]
+
+            if output_rows.empty or acteff_rows.empty:
+                print(
+                    f"Missing OUTPUT or ACT_EFF for process {process_name}, skipping."
+                )
+                continue
+
+            output_row = output_rows.iloc[0]
+            acteff_row = acteff_rows.iloc[0]
+
+            # Update the existing ACT_EFF row: calculate (first OUTPUT / ACT_EFF) for each year.
             for year in years_columns:
-                updated_times_df.loc[index, year] = ""
+                try:
+                    output_value = float(output_row[year])
+                    acteff_value = float(acteff_row[year])
+                    new_eff = output_value / acteff_value if acteff_value else ""
+                    # Update the ACT_EFF row (using its actual index)
+                    updated_times_df.loc[acteff_row.name, year] = new_eff
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    updated_times_df.loc[acteff_row.name, year] = ""
+
+            # # Clear the year column values for all OUTPUT rows in this process.
+            # for idx in output_rows.index:
+            #     for year in years_columns:
+            #         updated_times_df.loc[idx, year] = ""
+
+            # # Optionally, if there are INPUT rows that should be cleared, do so as well:
+            # input_rows = process_slice[process_slice["Attribute"] == "INPUT"]
+            # for idx in input_rows.index:
+            #     for year in years_columns:
+            #         updated_times_df.loc[idx, year] = ""
 
     return updated_times_df
 
@@ -1341,7 +1416,12 @@ unique_processes = times_df["TechName"].unique()
 pow_processes = [process for process in unique_processes if "pow_" in process.lower()]
 
 # Skip processes that end with '_ag'
-pow_processes = [process for process in pow_processes if not process.endswith("_ag")]
+allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_")
+pow_processes = [
+    process
+    for process in pow_processes
+    if not (process.endswith("_ag") and not process.startswith(allowed_prefixes_for_ag))
+]
 
 for process in pow_processes:
     if process in handled_processes:

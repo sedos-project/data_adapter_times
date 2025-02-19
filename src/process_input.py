@@ -29,8 +29,54 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         if process is None or "pow_" not in process.lower():
             continue  # Skip this row if the process does not contain 'pow_'
 
-        if process.endswith("_ag"):
-            continue  # Skip this row if the process ends with 'ag'
+        proc_lower = process.lower()
+        ignore_prefixes = (
+            "al_",
+            "at_",
+            "ba_",
+            "be_",
+            "bg_",
+            "ch_",
+            "cy_",
+            "cz_",
+            "dk_",
+            "ee_",
+            "es_",
+            "fi_",
+            "fr_",
+            "gb_",
+            "gr_",
+            "hr_",
+            "hu_",
+            "ie_",
+            "is_",
+            "it_",
+            "lu_",
+            "lv_",
+            "me_",
+            "mk_",
+            "nl_",
+            "no_",
+            "pl_",
+            "pt_",
+            "ro_",
+            "rs_",
+            "se_",
+            "si_",
+            "sk_",
+        )
+        allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_")
+
+        # Skip if process starts with any ignored prefix,
+        # unless it ends with '_ag' and starts with one of the allowed prefixes.
+        if proc_lower.startswith(ignore_prefixes):
+            continue
+
+        # Additionally, if process ends with '_ag' but doesn't start with an allowed prefix, skip it.
+        if proc_lower.endswith("_ag") and not proc_lower.startswith(
+            allowed_prefixes_for_ag
+        ):
+            continue
 
         input_str = str(row.get("input", "")) if pd.notna(row.get("input")) else ""
         output_str = str(row.get("output", "")) if pd.notna(row.get("output")) else ""
