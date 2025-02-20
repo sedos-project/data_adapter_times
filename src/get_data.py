@@ -914,6 +914,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                             if (
                                 "shared_potential_id" in api_process_data.columns
                                 and "capacity_p_abs_new_max" in api_col
+                                and not "_0" in process_name
                             ):
                                 matching_row = times_df_filtered[
                                     (times_df_filtered["Attribute"] == "CAP_BND")
@@ -947,6 +948,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                 if (
                                     "shared_potential_id" in api_process_data.columns
                                     and "capacity_p_abs_new_max" in api_col
+                                    and not "_0" in process_name
                                 ):
                                     new_row["Attribute"] = "CAP_BND"
                                     new_row["LimType"] = "UP"
@@ -957,10 +959,18 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                     [times_df_filtered, new_row.to_frame().T],
                                     ignore_index=True,
                                 )
-                                new_row_idx = times_df_filtered[
-                                    (times_df_filtered["Attribute"] == times_col)
-                                    | (times_df_filtered["Attribute"] == "CAP_BND")
-                                ].index[-1]
+                                if (
+                                    "shared_potential_id" in api_process_data.columns
+                                    and "capacity_p_abs_new_max" in api_col
+                                    and not "_0" in process_name
+                                ):
+                                    new_row_idx = times_df_filtered[
+                                        (times_df_filtered["Attribute"] == "CAP_BND")
+                                    ].index[-1]
+                                else:
+                                    new_row_idx = times_df_filtered[
+                                        (times_df_filtered["Attribute"] == times_col)
+                                    ].index[-1]
                                 if api_value is not None:
                                     # If the sedos_item contains 'cb_coefficient', apply 1/api_value
                                     if "cb_coefficient" in sedos_item:
