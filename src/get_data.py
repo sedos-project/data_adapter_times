@@ -1399,16 +1399,20 @@ def calculate_act_eff(times_df):
                 except (ValueError, ZeroDivisionError, KeyError, TypeError):
                     updated_times_df.loc[acteff_row.name, year] = ""
 
-            # # Clear the year column values for all OUTPUT rows in this process.
-            # for idx in output_rows.index:
-            #     for year in years_columns:
-            #         updated_times_df.loc[idx, year] = ""
+            # Check if the process name contains "chp" (case insensitive) and update the attribute
+            if "chp" in process_name.lower():
+                updated_times_df.loc[acteff_row.name, "Attribute"] = "EFF"
 
-            # # Optionally, if there are INPUT rows that should be cleared, do so as well:
-            # input_rows = process_slice[process_slice["Attribute"] == "INPUT"]
-            # for idx in input_rows.index:
-            #     for year in years_columns:
-            #         updated_times_df.loc[idx, year] = ""
+            # Clear the year column values for all OUTPUT rows in this process.
+            for idx in output_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[idx, year] = ""
+
+            # Optionally, if there are INPUT rows that should be cleared, do so as well:
+            input_rows = process_slice[process_slice["Attribute"] == "INPUT"]
+            for idx in input_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[idx, year] = ""
 
     return updated_times_df
 
