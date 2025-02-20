@@ -658,6 +658,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                     "MWh",
                                     "GWh",
                                     "PJ",
+                                    "PJ/PJ",
                                     "MWh/MWh",
                                 }:
                                     desired_unit = desired_units_mapping.get(
@@ -690,6 +691,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                         "MWh",
                                         "GWh",
                                         "PJ",
+                                        "PJ/PJ",
                                         "MWh/MWh",
                                     }:
                                         print(
@@ -714,6 +716,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                         "MWh",
                                         "GWh",
                                         "PJ",
+                                        "PJ/PJ",
                                         "MWh/MWh",
                                     }:
                                         desired_unit = desired_units_mapping.get(
@@ -750,6 +753,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                             "MWh",
                                             "GWh",
                                             "PJ",
+                                            "PJ/PJ",
                                             "MWh/MWh",
                                         }:
                                             print(
@@ -899,11 +903,25 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                             # temporary fix
                             continue
                         else:
+                            # NEW: Skip processing if shared_potential_id exists and api_col is capacity_p_min or capacity_p_max
+                            if (
+                                "shared_potential_id" in api_process_data.columns
+                                and api_col in ["capacity_p_min", "capacity_p_max"]
+                            ):
+                                continue
+
                             # Check if only the Attribute matches
-                            matching_row = times_df_filtered[
-                                (times_df_filtered["Attribute"] == times_col)
-                                | (times_df_filtered["Attribute"] == "CAP_BND")
-                            ]
+                            if (
+                                "shared_potential_id" in api_process_data.columns
+                                and "capacity_p_abs_new_max" in api_col
+                            ):
+                                matching_row = times_df_filtered[
+                                    (times_df_filtered["Attribute"] == "CAP_BND")
+                                ]
+                            else:
+                                matching_row = times_df_filtered[
+                                    (times_df_filtered["Attribute"] == times_col)
+                                ]
                             # Fetch unit from units_mapping by matching resource_name to process_name
                             source_unit = None
                             for (
@@ -928,7 +946,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                 new_row["TechName"] = process_name
                                 if (
                                     "shared_potential_id" in api_process_data.columns
-                                    and "capacity_p_max" in api_col
+                                    and "capacity_p_abs_new_max" in api_col
                                 ):
                                     new_row["Attribute"] = "CAP_BND"
                                     new_row["LimType"] = "UP"

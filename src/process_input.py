@@ -64,6 +64,18 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
             "se_",
             "si_",
             "sk_",
+            "il_",
+            "lt_",
+            "ly_",
+            "ma_",
+            "md_",
+            "mt_",
+            "ps_",
+            "tn_",
+            "tr_",
+            "ua_",
+            "uk_",
+            "xk_",
         )
         allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_")
 
