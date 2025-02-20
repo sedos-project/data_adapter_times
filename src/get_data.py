@@ -547,6 +547,7 @@ def data_mapping(times_df, process_name, is_group=False):
 
     # Fetch metadata
     metadata = fetch_process_metadata(process_name)
+    allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_")
 
     if is_group:
         grp_name = process_name
@@ -556,7 +557,9 @@ def data_mapping(times_df, process_name, is_group=False):
         process_count = 0  # Initialize a counter for the processes handled
 
         for process, group_data in process_groups:
-            if process.endswith("_ag"):  # Skip processes ending with _ag
+            if process.endswith("_ag") and not process.startswith(
+                allowed_prefixes_for_ag
+            ):  # Skip processes ending with _ag but not those starting with the allowed prefixes
                 continue
 
             # Remove columns where all values are NaN (i.e., columns without any data)
@@ -1401,10 +1404,11 @@ for process_group in process_groups:
 
 # Fetch and process data for each unique process in the TechName column that starts with 'helper_'
 unique_processes = times_df["TechName"].unique()
+allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_", "helper_")
 helper_processes = [
     process
     for process in unique_processes
-    if process.startswith("helper_") and not process.startswith("helper_sink_")
+    if process.startswith(allowed_prefixes_for_ag) and not "_sink_" in process.lower()
 ]
 
 # Iterate over the filtered helper processes

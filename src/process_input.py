@@ -26,11 +26,17 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
 
     for _, row in original_df.iterrows():
         process = str(row.get("process", "")).lower()
-        if not process.startswith("helper_") or process.startswith("helper_sink_"):
+        allowed_prefixes_for_ag = ("a_", "b_", "c_", "d_", "e_", "f_", "g_", "helper_")
+
+        if (
+            not process.startswith(allowed_prefixes_for_ag)
+            or "_sink_" in process.lower()
+        ):
             continue  # Skip this row if the process does not meet the criteria
 
-        if process.endswith("_ag"):
-            continue  # Skip this row if the process ends with 'ag'
+        # Additionally, if process ends with '_ag' but doesn't start with an allowed prefix, skip it.
+        if process.endswith("_ag") and not process.startswith(allowed_prefixes_for_ag):
+            continue
 
         input_str = str(row.get("input", "")) if pd.notna(row.get("input")) else ""
         output_str = str(row.get("output", "")) if pd.notna(row.get("output")) else ""
