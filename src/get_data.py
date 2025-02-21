@@ -334,8 +334,18 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 .values
             )
 
+            flo_commodity = (
+                updated_df.loc[
+                    (updated_df["TechName"] == process_name)
+                    & (updated_df["Attribute"] == "FLO_SHAR"),
+                    "Comm-OUT",
+                ]
+                .dropna()
+                .values
+            )
+
             if output_commodity.size > 0:  # Check if array is not empty
-                if "_chp_" in process_name:
+                if "_chp_" in process_name or flo_commodity.size > 0:
                     primary_cg = "NRGO"
                 else:
                     primary_cg = output_commodity[0]
@@ -347,7 +357,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
             else:
-                if "_chp_" in process_name:
+                if "_chp_" in process_name or flo_commodity.size > 0:
                     primary_cg = "NRGO"
                 else:
                     primary_cg = "notFound"
