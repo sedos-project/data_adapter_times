@@ -1390,7 +1390,14 @@ updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
 process_groups = [
-    # Add other process groups here if needed
+    "pow_helper_a",
+    "pow_helper_b",
+    "pow_helper_c",
+    "pow_helper_d",
+    "pow_helper_de",
+    "pow_helper_e",
+    "pow_helper_f",
+    "pow_helper_g",
 ]
 # Load the desired units mapping once at the start
 desired_units_mapping = load_desired_units_mapping()
