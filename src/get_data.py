@@ -274,7 +274,9 @@ def update_commodity_list_units(excel_file_path, units_mapping):
         for field in fields:
             field_name = field["field_name"]
             field_unit = field["unit"]
+            # Only process field names starting with 'conversion_factor_'
             if field_name.startswith("conversion_factor_"):
+                # Remove the 'conversion_factor_' prefix directly
                 comm_name = field_name[len("conversion_factor_") :]
                 found = False
                 for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
@@ -287,7 +289,7 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                             unit_cell = row[unit_col - 1]
                             unit_cell.value = field_unit
                             found = True
-                            break
+                            break  # Assuming CommName is unique
                 if not found:
                     print(
                         f"CommName '{comm_name}' with unit '{field_unit}' not found in Commodity List sheet."
@@ -353,12 +355,18 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "DEMO"
                 else:
                     primary_cg = output_commodity[0]
+
                 row[primary_cg_col - 1].value = primary_cg
+                primary_cg_temp = output_commodity[0]
 
                 # Find the Tact unit by searching the resource in units_mapping
                 for resource_name, fields in units_mapping.items():
                     for field in fields:
-                        if field["field_name"] == f"conversion_factor_{primary_cg}":
+                        if (
+                            field["field_name"] == f"conversion_factor_{primary_cg}"
+                            or field["field_name"]
+                            == f"conversion_factor_{primary_cg_temp}"
+                        ):
                             if field["unit"]:
                                 row[tact_col - 1].value = field["unit"]
                             else:
@@ -483,11 +491,13 @@ def data_mapping(times_df, process_name, is_group=False):
             # Remove columns where all values are NaN (i.e., columns without any data)
             group_data = group_data.dropna(axis=1, how="all")
 
-            handled_processes.append(process)
-            times_df = data_mapping_internal(
-                times_df, process, group_data, metadata, grp_name
-            )  # Call internal function for each process
-            process_count += 1  # Increment the counter for each handled process
+            # Only process if not already handled
+            if process not in handled_processes:
+                handled_processes.add(process)
+                times_df = data_mapping_internal(
+                    times_df, process, group_data, metadata, grp_name
+                )  # Call internal function for each process
+                process_count += 1  # Increment the counter for each handled process
 
         print(
             f"{process_count} processes were handled inside the process group: {process_name}"
@@ -1642,7 +1652,7 @@ process_groups = [
 desired_units_mapping = load_desired_units_mapping()
 
 # Define a global list to keep track of processes that have been handled
-handled_processes = []
+handled_processes = set()
 
 # Handle pre-defined process groups first
 for process_group in process_groups:
@@ -1656,10 +1666,12 @@ tra_processes = [process for process in unique_processes if process.startswith("
 tra_processes = [process for process in tra_processes if not process.endswith("_ag")]
 
 for process in tra_processes:
-    if process not in handled_processes:
-        updated_df = data_mapping(
-            updated_df, process
-        )  # Perform data mapping and update updated_df
+    if process in handled_processes:
+        print(f"Process {process} already handled in process group, skipping.")
+        continue
+    updated_df = data_mapping(
+        updated_df, process
+    )  # Perform data mapping and update updated_df
 
 # Calculate ACT_EFF attributes
 updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)

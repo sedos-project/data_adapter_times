@@ -79,6 +79,8 @@ def define_energy_model_units():
     NamedComposedUnit("GWh", unit("GW") * unit("h"))
     NamedComposedUnit("TWh", unit("TW") * unit("h"))
 
+    NamedComposedUnit("MWh/MWh", unit("MWh") * unit("MWh"))
+    NamedComposedUnit("GWh/GWh", unit("GWh") * unit("GWh"))
     NamedComposedUnit("kWh*day", unit("kWh") * unit("day"))
     NamedComposedUnit("MWh*day", unit("MWh") * unit("day"))
     NamedComposedUnit("GWh*day", unit("GWh") * unit("day"))
@@ -145,8 +147,9 @@ def define_energy_model_units():
 
     NamedComposedUnit("€/MW", unit("EUR") / unit("MW"))
 
-    NamedComposedUnit("EUR/MW*a", unit("EUR") / unit("MW") * unit("a"))
-    NamedComposedUnit("€/MW*a", unit("EUR") / unit("MW") * unit("a"))
+    NamedComposedUnit("EUR/(MW*a)", unit("EUR") / (unit("MW") * unit("a")))
+    NamedComposedUnit("EUR/MW*a", unit("EUR") / (unit("MW") * unit("a")))
+    NamedComposedUnit("€/MW*a", unit("EUR") / (unit("MW") * unit("a")))
     NamedComposedUnit("EUR/MW/a", unit("EUR") / unit("MW") / unit("a"))
     NamedComposedUnit("EUR/W/a", unit("EUR") / unit("W") / unit("a"))
 
@@ -156,8 +159,8 @@ def define_energy_model_units():
 
     NamedComposedUnit("EUR/kW", unit("EUR") / unit("kW"))
     NamedComposedUnit("EUR/W", unit("EUR") / unit("W"))
-    NamedComposedUnit("EUR/W*a,", unit("EUR") / unit("W") * unit("a"))
-    NamedComposedUnit("EUR/kW*a,", unit("EUR") / unit("kW") * unit("a"))
+    NamedComposedUnit("EUR/W*a", unit("EUR") / unit("W") * unit("a"))
+    NamedComposedUnit("EUR/kW*a", unit("EUR") / (unit("kW") * unit("a")))
 
     NamedComposedUnit("EUR/pkm", unit("EUR") / unit("pkm"))
     NamedComposedUnit("MEUR/pkm", unit("MEUR") / unit("pkm"))
@@ -173,6 +176,12 @@ def define_energy_model_units():
     NamedComposedUnit("M€/Million units", unit("MEUR") / unit("M_units"))
     NamedComposedUnit("MEUR/PJ", unit("MEUR") / unit("PJ"))
     NamedComposedUnit("M€/PJ", unit("MEUR") / unit("PJ"))
+
+    NamedComposedUnit("MEUR/GW", unit("MEUR") / unit("GW"))
+    NamedComposedUnit("MEUR/(GW*a)", unit("MEUR") / (unit("GW") * unit("a")))
+    NamedComposedUnit("MEUR/GWh", unit("MEUR") / unit("GWh"))
+    NamedComposedUnit("Kt/Mt", unit("Kt") / unit("Mt"))
+    NamedComposedUnit("EUR/kW*a", unit("EUR") / (unit("kW") * unit("a")))
 
     NamedComposedUnit("kWh/100km", unit("kWh") / unit("100km"))
     NamedComposedUnit("MWh/100km", unit("MWh") / unit("100km"))
