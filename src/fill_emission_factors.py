@@ -132,13 +132,20 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
             other_indexes = col_parts[0].replace("ef_", "")
             cset_cn = "emi_" + col_parts[1]
             print(f"Processing {cset_cn} for process {process_name}")
+
+            # Get the value from the 7th row of the API data
+            api_value = (
+                api_data[api_col].iloc[6] if not api_data[api_col].empty else None
+            )
+
             # Detect when 'emi_co2_f_' occurs
             if "emi_co2_f" in cset_cn or "emi_co2_neg" in cset_cn:
-                # Get the value from the 7th row of the API data
-                api_value = api_data[api_col].iloc[6]
 
                 # Remove 'global_emission_factors.' and keep the remaining string
-                if "global_emission_factors." in api_value:
+                if (
+                    isinstance(api_value, str)
+                    and "global_emission_factors." in api_value
+                ):
                     remaining_string = api_value.replace("global_emission_factors.", "")
                     if remaining_string in global_emission_data.columns:
                         # Get the value from the 7th row in the global emission factors
@@ -147,11 +154,6 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
                             if not global_emission_data[remaining_string].empty
                             else None
                         )
-            else:
-                # Get the value from the first row of the api_col
-                api_value = (
-                    api_data[api_col].iloc[6] if not api_data[api_col].empty else None
-                )
 
             # Determine the value to be pasted in the Attribute column
             attribute_value = (
