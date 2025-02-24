@@ -1387,7 +1387,8 @@ updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
 process_groups = [
-    # Add other process groups here if needed
+   "pow_biogas_prod_de" # process belongs to AP5-x2x, but data provided by AP4-powe
+   # Add other process groups here if needed
 ]
 # Load the desired units mapping once at the start
 desired_units_mapping = load_desired_units_mapping()
