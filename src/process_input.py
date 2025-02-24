@@ -89,12 +89,12 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         )
 
         if output_bracketed_items:
-            # Append ACT_EFF attribute and its CommGrp
-            technology_names.append(process)
-            comms_in.append(None)
-            comms_out.append(None)
-            attributes.append("ACT_EFF")
-            comm_grps.append(comm_grp_str_out)
+            # # Append ACT_EFF attribute and its CommGrp
+            # technology_names.append(process)
+            # comms_in.append(None)
+            # comms_out.append(None)
+            # attributes.append("ACT_EFF")
+            # comm_grps.append(comm_grp_str_out)
 
             # Append FLO_SHAR attributes for each bracketed item in output_str
             for original_item in output_bracketed_items:
