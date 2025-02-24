@@ -103,7 +103,7 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
                     technology_names.append(process)
                     comms_in.append(None)
                     comms_out.append(item)
-                    attributes.append("FLO_SHAR")
+                    attributes.append("CEFF")
                     comm_grps.append(comm_grp_str_out)
                     # Collect elements for the comm_grp
                     if comm_grp_str_out in comm_grp_elements:

@@ -593,13 +593,14 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                         times_df_filtered.at[idx, str(year)] = api_value
                             else:
                                 matching_row = times_df_filtered[
-                                    (times_df_filtered["Attribute"] == "ACT_EFF")
+                                    (times_df_filtered["Attribute"] == "CEFF")
+                                    & (times_df_filtered["Comm-OUT"] == comm_col_value)
                                 ]
                                 if not matching_row.empty:
                                     for idx in matching_row.index:
                                         if api_value is not None:
                                             times_df_filtered.at[idx, str(year)] = (
-                                                1 / api_value
+                                                api_value
                                             )
                         elif "flow_share" in sedos_item:
                             # Add flow share values
