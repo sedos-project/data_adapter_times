@@ -524,6 +524,8 @@ def data_mapping_internal(times_df, process_name, api_process_data):
         for sedos_item, api_cols in matched_columns.items()
     }
 
+    pasted_combinations = set()
+
     # Update the times_df_filtered with the api_process_data based on the matched columns
     for sedos_item, (
         api_cols,
@@ -591,32 +593,77 @@ def data_mapping_internal(times_df, process_name, api_process_data):
                                 ).strip("_")
 
                                 # Add values to the matching rows
-                                sum_of_matched_values = 0
+                                current_combo = (flow_share_commodity, year)
+
                                 for idx in matching_row.index:
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
+                                    comm_grp = times_df_filtered.at[idx, "CommGrp"]
                                     if flow_share_commodity in (comm_in, comm_out):
-                                        if api_value is not None:
-                                            times_df_filtered.at[idx, str(year)] = (
-                                                api_value / 100
-                                            )
-                                            times_df_filtered.at[idx, "LimType"] = (
-                                                constraint
-                                            )
-                                            sum_of_matched_values += api_value / 100
+                                        if current_combo not in pasted_combinations:
+                                            pasted_combinations.add(current_combo)
+                                            if api_value is not None:
+                                                times_df_filtered.at[idx, str(year)] = (
+                                                    api_value / 100
+                                                )
+                                                times_df_filtered.at[idx, "LimType"] = (
+                                                    constraint
+                                                )
+                                        else:
+                                            matching_row_new = times_df_filtered[
+                                                (
+                                                    times_df_filtered["LimType"]
+                                                    == constraint
+                                                )
+                                                & (
+                                                    times_df_filtered["Attribute"]
+                                                    == times_col
+                                                )
+                                                & (
+                                                    (
+                                                        times_df_filtered["Comm-IN"]
+                                                        == flow_share_commodity
+                                                    )
+                                                    | (
+                                                        times_df_filtered["Comm-OUT"]
+                                                        == flow_share_commodity
+                                                    )
+                                                )
+                                            ]
+                                            if matching_row_new.empty:
 
-                                # Handle the rows that do not match the flow share commodity
-                                for idx in matching_row.index:
-                                    if flow_share_commodity not in (
-                                        times_df_filtered.at[idx, "Comm-IN"],
-                                        times_df_filtered.at[idx, "Comm-OUT"],
-                                    ):
-                                        times_df_filtered.at[idx, str(year)] = (
-                                            1 - sum_of_matched_values
-                                        )
-                                        times_df_filtered.at[idx, "LimType"] = (
-                                            constraint
-                                        )
+                                                # Add a new row if the Attribute does not exist
+                                                new_row = pd.Series(
+                                                    {
+                                                        col: pd.NA
+                                                        for col in times_df_filtered.columns
+                                                    }
+                                                )
+                                                new_row["TechName"] = process_name
+                                                new_row["Comm-IN"] = comm_in
+                                                new_row["Comm-OUT"] = comm_out
+                                                new_row["CommGrp"] = comm_grp
+                                                new_row["Attribute"] = times_col
+                                                new_row["LimType"] = constraint
+                                                if api_value is not None:
+                                                    new_row[str(year)] = api_value / 100
+                                                times_df_filtered = pd.concat(
+                                                    [
+                                                        times_df_filtered,
+                                                        new_row.to_frame().T,
+                                                    ],
+                                                    ignore_index=True,
+                                                )
+                                            else:
+                                                for idx in matching_row_new.index:
+                                                    times_df_filtered.at[
+                                                        idx, "CommGrp"
+                                                    ] = comm_grp
+                                                    if api_value is not None:
+                                                        times_df_filtered.at[
+                                                            idx, str(year)
+                                                        ] = (api_value / 100)
+
                         elif (
                             "availability_constant" in sedos_item
                             or "availability_timeseries_fixed" in sedos_item

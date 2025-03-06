@@ -120,7 +120,18 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
         return
 
     # Define the sequence of years to be repeated
-    year_sequence = "2021,2024,2027,2030,2035,2040,2045,2050,2060,2070"
+    year_sequence = [
+        "2021",
+        "2024",
+        "2027",
+        "2030",
+        "2035",
+        "2040",
+        "2045",
+        "2050",
+        "2060",
+        "2070",
+    ]
 
     for api_col in api_data.columns:
         if api_col.startswith("ef_"):
@@ -134,7 +145,7 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
             print(f"Processing {cset_cn} for process {process_name}")
 
             if "ind_agri_" in process_name:
-                api_value = ", ".join(map(str, api_data[api_col].dropna().tolist()))
+                api_values_list = api_data[api_col].dropna().tolist()
             else:
                 # Get the value from the 7th row of the API data
                 api_value = (
@@ -164,7 +175,26 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
             )
 
             # If there is a value, add it to the worksheet
-            if api_value is not None:
+            if "ind_agri_" in process_name and api_values_list:
+                for year, api_val in zip(year_sequence, api_values_list):
+                    ws.cell(
+                        row=start_row,
+                        column=col_indices["Attribute"],
+                        value=attribute_value,
+                    )
+                    ws.cell(
+                        row=start_row,
+                        column=col_indices["Other_Indexes"],
+                        value=other_indexes,
+                    )
+                    ws.cell(row=start_row, column=col_indices["Cset_CN"], value=cset_cn)
+                    ws.cell(
+                        row=start_row, column=col_indices["Pset_PN"], value=process_name
+                    )
+                    ws.cell(row=start_row, column=col_indices["DE"], value=api_val)
+                    ws.cell(row=start_row, column=col_indices["Year"], value=year)
+                    start_row += 1
+            elif api_value is not None:
                 ws.cell(
                     row=start_row,
                     column=col_indices["Attribute"],
@@ -180,7 +210,11 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
                     row=start_row, column=col_indices["Pset_PN"], value=process_name
                 )
                 ws.cell(row=start_row, column=col_indices["DE"], value=api_value)
-                ws.cell(row=start_row, column=col_indices["Year"], value=year_sequence)
+                ws.cell(
+                    row=start_row,
+                    column=col_indices["Year"],
+                    value=", ".join(year_sequence),
+                )
                 start_row += 1
             else:
                 print(f"No value found for {api_col} in process {process_name}")
