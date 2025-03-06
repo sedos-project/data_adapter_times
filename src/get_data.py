@@ -377,7 +377,6 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 elif (
                     "_oref_" in process_name
-                    or "_x2liquid_ft_" in process_name
                     or "_biogas_treatment" in process_name
                     or "_aec_" in process_name
                     or "_pemec_" in process_name
@@ -385,6 +384,8 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     or "_coel_" in process_name
                 ):
                     primary_cg = "NRGI"
+                elif "_x2liquid_ft_" in process_name:
+                    primary_cg = "sec_syngas"
                 else:
                     primary_cg = output_commodity[0]
 
@@ -406,7 +407,6 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 elif (
                     "_oref_" in process_name
-                    or "_x2liquid_ft_" in process_name
                     or "_biogas_treatment" in process_name
                     or "_aec_" in process_name
                     or "_pemec_" in process_name
@@ -414,6 +414,8 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     or "_coel_" in process_name
                 ):
                     primary_cg = "NRGI"
+                elif "_x2liquid_ft_" in process_name:
+                    primary_cg = "sec_syngas"
                 else:
                     primary_cg = "notFound"
                 row[primary_cg_col - 1].value = primary_cg
@@ -1296,10 +1298,23 @@ def calculate_act_eff(times_df):
                 new_val = ""
             updated_times_df.loc[act_eff_index, year] = new_val
 
-        # Clear the year column values for the INPUT and OUTPUT rows.
+        # Clear INPUT rows **only if they do NOT match "x2x_x2liquid_ft_" with Comm-IN = "sec_elec"**
         for index in input_rows.index:
-            for year in years_columns:
-                updated_times_df.loc[index, year] = ""
+            if process == "x2x_x2liquid_ft_1":
+                row_comm_in = (
+                    updated_times_df.loc[index, "Comm-IN"]
+                    if "Comm-IN" in updated_times_df.columns
+                    else None
+                )
+                # Check the specific row's Comm-IN value before clearing
+                if row_comm_in == "sec_elec":
+                    continue  # Do NOT clear this row
+                else:
+                    for year in years_columns:
+                        updated_times_df.loc[index, year] = ""
+            else:
+                for year in years_columns:
+                    updated_times_df.loc[index, year] = ""
 
     # --------------------------------------------------------------------------
     # Now, process the two specific processes using the original logic.
@@ -1387,8 +1402,8 @@ updated_df = times_df.copy()
 
 # Pre-defined process groups to handle
 process_groups = [
-   "pow_biogas_prod_de" # process belongs to AP5-x2x, but data provided by AP4-powe
-   # Add other process groups here if needed
+    "pow_biogas_prod_de"  # process belongs to AP5-x2x, but data provided by AP4-powe
+    # Add other process groups here if needed
 ]
 # Load the desired units mapping once at the start
 desired_units_mapping = load_desired_units_mapping()
