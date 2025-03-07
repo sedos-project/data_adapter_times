@@ -327,6 +327,16 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             if output_commodity.size > 0:  # Check if array is not empty
                 if "_autoproducer_" in process_name:
                     primary_cg = "NRGO"
+                elif (
+                    "_aec_" in process_name
+                    or "_pemec_" in process_name
+                ):
+                    primary_cg = "NRGI"
+                elif (
+                    "_soec_" in process_name
+                ):
+                    primary_cg = "sec_elec_ind"
+                
                 else:
                     primary_cg = output_commodity[0]
                 row[primary_cg_col - 1].value = primary_cg
@@ -930,7 +940,8 @@ updated_df = times_df.copy()
 process_groups = [
     "exo_other_ind",
     "iip_autoproducer",
-    "iip_new_autoproducer",  # Add other process groups here if needed
+    "iip_new_autoproducer", 
+    "iip_district_heating_high", # Add other process groups here if needed
 ]
 
 # Define a global list to keep track of processes that have been handled
