@@ -1327,8 +1327,10 @@ def calculate_act_eff(times_df):
     # --------------------------------------------------------------------------
     # Now, process the two specific processes using the original logic.
     # Here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_elec")
+    # here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_syngas_sr" or "sec_hydrogen_orig")
     # divided by the first INPUT row's value.
-    specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]
+    specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1", "x2x_x2gas_sr_syngas_0", "x2x_x2gas_sr_syngas_1", 
+                          "x2x_x2gas_sr_syngas_psa_0", "x2x_x2gas_sr_syngas_psa_1"]
     specific_process_positions = []
     for process_name in specific_processes:
         process_df = times_df[times_df["TechName"] == process_name]
@@ -1347,7 +1349,8 @@ def calculate_act_eff(times_df):
         input_rows = process_subset[process_subset["Attribute"] == "INPUT"]
         output_rows = process_subset[
             (process_subset["Attribute"] == "OUTPUT")
-            & (process_subset["Comm-OUT"] == "sec_elec")
+            & ((process_subset["Comm-OUT"] == "sec_elec") | (process_subset["Comm-OUT"] == "sec_syngas_sr") |
+               (process_subset["Comm-OUT"] == "sec_hydrogen_orig"))
         ]
 
         if input_rows.empty or output_rows.empty:
@@ -1387,13 +1390,35 @@ def calculate_act_eff(times_df):
             ignore_index=True,
         )
 
-        # Clear the year column values for the INPUT and OUTPUT rows.
+        # # Clear the year column values for the INPUT and OUTPUT rows.
+        # for index in input_rows.index:
+        #     for year in years_columns:
+        #         updated_times_df.loc[index, year] = ""
+        # for index in output_rows.index:
+        #     for year in years_columns:
+        #         updated_times_df.loc[index, year] = ""
+
+        # Clear INPUT rows **only if they do NOT match "x2x_x2gas_sr_syngas_1" and "x2x_x2gas_sr_syngas_0" with Comm-IN = "sec_elec"**
         for index in input_rows.index:
-            for year in years_columns:
-                updated_times_df.loc[index, year] = ""
+            if process_name in specific_processes:
+                row_comm_in = (
+                    updated_times_df.loc[index, "Comm-IN"]
+                    if "Comm-IN" in updated_times_df.columns
+                    else None
+                )
+                # Check the specific row's Comm-IN value before clearing
+                if row_comm_in == "sec_elec":
+                    continue  # Do NOT clear this row
+                else:
+                    for year in years_columns:
+                        updated_times_df.loc[index, year] = ""
+            else:
+                for year in years_columns:
+                    updated_times_df.loc[index, year] = ""
+        # clear output rows
         for index in output_rows.index:
             for year in years_columns:
-                updated_times_df.loc[index, year] = ""
+                updated_times_df.loc[index, year] = ""            
 
     return updated_times_df
 
