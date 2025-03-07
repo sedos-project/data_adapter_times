@@ -380,10 +380,14 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     or "_biogas_treatment" in process_name
                     or "_aec_" in process_name
                     or "_pemec_" in process_name
-                    or "_soec_" in process_name
-                    or "_coel_" in process_name
+                    #or "_soec_" in process_name
                 ):
                     primary_cg = "NRGI"
+                elif (
+                    "_soec_" in process_name
+                    or "_coel_" in process_name
+                ):
+                    primary_cg = "sec_elec"
                 elif "_x2liquid_ft_" in process_name:
                     primary_cg = "sec_syngas"
                 else:
@@ -410,10 +414,14 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     or "_biogas_treatment" in process_name
                     or "_aec_" in process_name
                     or "_pemec_" in process_name
-                    or "_soec_" in process_name
-                    or "_coel_" in process_name
+                    #or "_soec_" in process_name
                 ):
                     primary_cg = "NRGI"
+                elif (
+                    "_soec_" in process_name
+                    or "_coel_" in process_name
+                ):
+                    primary_cg = "sec_elec"
                 elif "_x2liquid_ft_" in process_name:
                     primary_cg = "sec_syngas"
                 else:
