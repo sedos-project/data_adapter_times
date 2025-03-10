@@ -1296,15 +1296,27 @@ def calculate_act_eff(times_df):
         act_eff_row = act_eff_rows.iloc[0]
         act_eff_index = act_eff_rows.index[0]
 
-        # Calculate new ACT_EFF values (ACT_EFF cell divided by INPUT cell for each year)
+        # Calculate new ACT_EFF values 
         for year in years_columns:
-            try:
-                input_value = float(input_row[year])
-                act_eff_value = float(act_eff_row[year])
-                new_val = act_eff_value / input_value if input_value else ""
-            except (ValueError, ZeroDivisionError, KeyError, TypeError):
-                new_val = ""
-            updated_times_df.loc[act_eff_index, year] = new_val
+            # input based process directly takes primary input value as ACT_EFF
+            # "x2x_x2liquid_oref_0", "x2x_x2liquid_oref_1", "x2x_x2liquid_ft_1"
+            if process in ["x2x_x2liquid_oref_0", "x2x_x2liquid_oref_1", "x2x_x2liquid_ft_1"]:
+                try:
+                    input_value = float(input_row[year])
+                    act_eff_value = float(act_eff_row[year])
+                    new_val = input_value if input_value else ""
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    new_val = ""
+                updated_times_df.loc[act_eff_index, year] = new_val
+            else:
+                # (ACT_EFF cell divided by INPUT cell for each year)
+                try:
+                    input_value = float(input_row[year])
+                    act_eff_value = float(act_eff_row[year])
+                    new_val = act_eff_value / input_value if input_value else ""
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    new_val = ""
+                updated_times_df.loc[act_eff_index, year] = new_val
 
         # Clear INPUT rows **only if they do NOT match "x2x_x2liquid_ft_" with Comm-IN = "sec_elec"**
         for index in input_rows.index:
