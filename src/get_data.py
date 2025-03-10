@@ -547,7 +547,7 @@ def data_mapping(times_df, process_name, is_group=False):
         # Check if 'version' column exists before filtering
         if "version" in api_process_data.columns:
             api_process_data = api_process_data[
-                api_process_data["version"] == "srd_point_draft"
+                api_process_data["version"] == "srd_point_sedos"
             ]
         else:
             print(f"'version' column not found in the {process_name} process data.")
@@ -1329,7 +1329,7 @@ def calculate_act_eff(times_df):
     # Here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_elec")
     # here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_syngas_sr" or "sec_hydrogen_orig")
     # divided by the first INPUT row's value.
-    specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1", "x2x_x2gas_sr_syngas_0", "x2x_x2gas_sr_syngas_1", 
+    specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1", 
                           "x2x_x2gas_sr_syngas_psa_0", "x2x_x2gas_sr_syngas_psa_1"]
     specific_process_positions = []
     for process_name in specific_processes:
