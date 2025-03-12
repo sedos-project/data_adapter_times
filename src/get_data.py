@@ -377,12 +377,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 elif (
                     "_oref_" in process_name
-                    or "_x2liquid_ft_" in process_name
-                    or "_biogas_treatment" in process_name
-                    or "_aec_" in process_name
-                    or "_pemec_" in process_name
-                    or "_soec_" in process_name
-                    or "_coel_" in process_name
+                    or "healper_tra_ind" in process_name
                 ):
                     primary_cg = "NRGI"
                 else:
@@ -406,12 +401,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 elif (
                     "_oref_" in process_name
-                    or "_x2liquid_ft_" in process_name
-                    or "_biogas_treatment" in process_name
-                    or "_aec_" in process_name
-                    or "_pemec_" in process_name
-                    or "_soec_" in process_name
-                    or "_coel_" in process_name
+                    or "healper_tra_ind" in process_name
                 ):
                     primary_cg = "NRGI"
                 else:
