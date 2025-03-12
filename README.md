@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is designed to convert SEDOS data into TIMES format for further use in emissions and energy modeling. The workflow involves configuring settings, preparing input data, and generating output data by running a sequence of scripts. The output includes multiple Excel and pickle files that represent emissions factors and other relevant energy sector data in TIMES format.
+This project is designed to convert OEP data into TIMES-VEDA format for further use in Energy System model. The workflow involves configuring settings, preparing input data, and generating output data by running a sequence of scripts. The output includes multiple Excel and pickle files that represent emissions factors and other relevant energy sector data in TIMES_VEDA format.
 
 ## Folder Structure
 
