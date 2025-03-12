@@ -790,6 +790,37 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                         ):
                             # temporary fix
                             continue
+                        elif "market_share_range" in sedos_item:
+                            # Handle availability constants or time series fixed
+                            matching_row = times_df_filtered[
+                                times_df_filtered["Attribute"] == times_col
+                            ]
+                            if matching_row.empty:
+                                # Add a new row if the Attribute does not exist
+                                new_row = pd.Series(
+                                    {col: pd.NA for col in times_df_filtered.columns}
+                                )
+                                new_row["TechName"] = process_name
+                                new_row["Attribute"] = times_col
+                                new_row["LimType"] = constraint
+                                times_df_filtered = pd.concat(
+                                    [times_df_filtered, new_row.to_frame().T],
+                                    ignore_index=True,
+                                )
+                                new_row_idx = times_df_filtered[
+                                    times_df_filtered["Attribute"] == times_col
+                                ].index[-1]
+                                if api_value is not None:
+                                    times_df_filtered.at[new_row_idx, str(year)] = (
+                                        api_value
+                                    )
+                            else:
+                                for idx in matching_row.index:
+                                    if api_value is not None:
+                                        times_df_filtered.at[idx, str(year)] = api_value
+                                        times_df_filtered.at[idx, "LimType"] = (
+                                            constraint
+                                        )
                         else:
                             # Check if only the Attribute matches
                             matching_row = times_df_filtered[
@@ -910,9 +941,19 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                                 f"Source unit {source_unit} for {api_col} not found."
                                             )
                                             converted_value = api_value  # If no unit is found, use the value as is
-                                        times_df_filtered.at[new_row_idx, str(year)] = (
-                                            converted_value
-                                        )
+                                        if "capacity_tra_max" in sedos_item:
+                                            if converted_value == 0:
+                                                times_df_filtered.at[
+                                                    new_row_idx, str(year)
+                                                ] = converted_value
+                                            else:
+                                                times_df_filtered.at[
+                                                    new_row_idx, str(year)
+                                                ] = ""
+                                        else:
+                                            times_df_filtered.at[
+                                                new_row_idx, str(year)
+                                            ] = converted_value
                                         times_df_filtered.at[new_row_idx, "LimType"] = (
                                             constraint
                                         )
@@ -1012,9 +1053,19 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                                     f"Source unit {source_unit} for {api_col} not found."
                                                 )
                                                 converted_value = api_value  # If no unit is found, use the value as is
-                                            times_df_filtered.at[idx, str(year)] = (
-                                                converted_value
-                                            )
+                                            if "capacity_tra_max" in sedos_item:
+                                                if converted_value == 0:
+                                                    times_df_filtered.at[
+                                                        new_row_idx, str(year)
+                                                    ] = converted_value
+                                                else:
+                                                    times_df_filtered.at[
+                                                        new_row_idx, str(year)
+                                                    ] = ""
+                                            else:
+                                                times_df_filtered.at[
+                                                    new_row_idx, str(year)
+                                                ] = converted_value
                                             times_df_filtered.at[idx, "LimType"] = (
                                                 constraint
                                             )
@@ -1161,7 +1212,7 @@ def calculate_act_eff(times_df, process_list_file_path):
         techname_cell = row[techname_col - 1]
         sets_cell = row[sets_col - 1]
         if techname_cell.value and sets_cell.value:
-            if "DEM" in str(sets_cell.value):
+            if "DEM" in str(sets_cell.value) or "wallbox" in str(techname_cell.value):
                 dem_technames.append(techname_cell.value)
 
     # Collect process positions
@@ -1202,6 +1253,9 @@ def calculate_act_eff(times_df, process_list_file_path):
                 # For 'tra_road' processes, check for 'INPUT' or 'ACT_EFF' rows
                 input_rows = times_df_filtered[
                     times_df_filtered["Attribute"] == "INPUT"
+                ]
+                output_rows = times_df_filtered[
+                    times_df_filtered["Attribute"] == "OUTPUT"
                 ]
                 act_eff_rows = times_df_filtered[
                     times_df_filtered["Attribute"] == "ACT_EFF"
@@ -1276,8 +1330,14 @@ def calculate_act_eff(times_df, process_list_file_path):
                     "2070",
                 ]:
                     try:
-                        input_value = float(input_row[year])
-                        act_eff_values[year] = input_value / 1000000000
+                        if "wallbox" in process_name.lower():
+                            output_row = output_rows.iloc[0]
+                            output_value = float(output_row[year])
+                            input_value = float(input_row[year])
+                            act_eff_values[year] = output_value / input_value
+                        else:
+                            input_value = float(input_row[year])
+                            act_eff_values[year] = input_value / 1000000000
                     except (ValueError, ZeroDivisionError, KeyError, TypeError):
                         act_eff_values[year] = ""
 
