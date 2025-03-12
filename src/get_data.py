@@ -537,7 +537,7 @@ def data_mapping(times_df, process_name, is_group=False):
         # Check if 'version' column exists before filtering
         if "version" in api_process_data.columns:
             api_process_data = api_process_data[
-                api_process_data["version"] == "srd_point_draft"
+                api_process_data["version"] == "srd_point_sedos"
             ]
         else:
             print(f"'version' column not found in the {process_name} process data.")
