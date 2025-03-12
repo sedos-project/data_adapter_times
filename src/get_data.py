@@ -1116,6 +1116,10 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
         cap2act_value = (
             0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
         )
+    elif "_wallbox_" in process_name.lower():
+        cap2act_value = (
+            31.536  # Set CAP2ACT to 0.536 if process name contains "wallbox"
+        )
 
     else:
         cap2act_value = 1  # Default CAP2ACT value
