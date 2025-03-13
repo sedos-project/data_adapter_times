@@ -345,11 +345,11 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             )
 
             if output_commodity.size > 0:  # Check if array is not empty
-                if "_chp_" in process_name or flo_commodity.size > 0:
+                if "_chp_" in process_name: # or flo_commodity.size > 0:
                     primary_cg = "NRGO"
                 else:
-                    primary_cg = output_commodity[0]
-
+                    # primary_cg = output_commodity[0]
+                    primary_cg = "" # heat sector all processes are OUTPUT based
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
@@ -357,11 +357,11 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
             else:
-                if "_chp_" in process_name or flo_commodity.size > 0:
+                if "_chp_" in process_name:#  or flo_commodity.size > 0:
                     primary_cg = "NRGO"
                 else:
-                    primary_cg = "notFound"
-                row[primary_cg_col - 1].value = primary_cg
+                    primary_cg = "" # heat sector all processes are OUTPUT based
+                row[primary_cg_col - 1].value =  primary_cg
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = "notFound"
