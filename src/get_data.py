@@ -625,32 +625,32 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                 ).strip("_")
 
                                 # Add values to the matching rows
-                                sum_of_matched_values = 0
+                                # sum_of_matched_values = 0
                                 for idx in matching_row.index:
                                     comm_in = times_df_filtered.at[idx, "Comm-IN"]
                                     comm_out = times_df_filtered.at[idx, "Comm-OUT"]
                                     if flow_share_commodity in (comm_in, comm_out):
                                         if api_value is not None:
                                             times_df_filtered.at[idx, str(year)] = (
-                                                api_value / 100
+                                                api_value
                                             )
                                             times_df_filtered.at[idx, "LimType"] = (
                                                 constraint
                                             )
-                                            sum_of_matched_values += api_value / 100
+                                            # sum_of_matched_values += api_value / 100
 
-                                # Handle the rows that do not match the flow share commodity
-                                for idx in matching_row.index:
-                                    if flow_share_commodity not in (
-                                        times_df_filtered.at[idx, "Comm-IN"],
-                                        times_df_filtered.at[idx, "Comm-OUT"],
-                                    ):
-                                        times_df_filtered.at[idx, str(year)] = (
-                                            1 - sum_of_matched_values
-                                        )
-                                        times_df_filtered.at[idx, "LimType"] = (
-                                            constraint
-                                        )
+                                # # Handle the rows that do not match the flow share commodity
+                                # for idx in matching_row.index:
+                                #     if flow_share_commodity not in (
+                                #         times_df_filtered.at[idx, "Comm-IN"],
+                                #         times_df_filtered.at[idx, "Comm-OUT"],
+                                #     ):
+                                #         times_df_filtered.at[idx, str(year)] = (
+                                #             1 - sum_of_matched_values
+                                #         )
+                                #         times_df_filtered.at[idx, "LimType"] = (
+                                #             constraint
+                                #         )
                         elif (
                             "availability_constant" in sedos_item
                             or "efficiency_sto_in" in sedos_item
@@ -810,21 +810,13 @@ def calculate_act_eff(times_df):
     Returns:
     pandas.DataFrame: The updated DataFrame with the 'ACT_EFF' attributes calculated.
     """
-    # Filter processes that start with 'ind_autoproducer'
-    ind_autoproducer_processes = times_df[
-        times_df["TechName"].str.startswith("ind_autoproducer")
-    ]
-
-    if ind_autoproducer_processes.empty:
-        print("No processes starting with 'ind_autoproducer' found.")
-        return times_df
 
     # Create a copy of the DataFrame to work with
     updated_times_df = times_df.copy()
 
     # Collect process positions
     process_positions = []
-    for process_name in ind_autoproducer_processes["TechName"].unique():
+    for process_name in times_df["TechName"].unique():
         # Filter rows for this process
         times_df_filtered = times_df[times_df["TechName"] == process_name]
 
@@ -850,18 +842,8 @@ def calculate_act_eff(times_df):
 
         # Find the first INPUT and OUTPUT rows
         input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
-        output_rows = times_df_filtered[times_df_filtered["Attribute"] == "OUTPUT"]
+        ceff_rows = times_df_filtered[times_df_filtered["Attribute"] == "CEFF"]
 
-        if input_rows.empty or output_rows.empty:
-            print(f"Missing INPUT or OUTPUT for process {process_name}, skipping.")
-            continue
-
-        # Take the first INPUT and OUTPUT rows
-        input_row = input_rows.iloc[0]
-        output_row = output_rows.iloc[0]
-
-        # Calculate ACT_EFF for each year
-        act_eff_values = {}
         years_columns = [
             "2021",
             "2024",
@@ -874,41 +856,16 @@ def calculate_act_eff(times_df):
             "2060",
             "2070",
         ]
-        for year in years_columns:
-            try:
-                input_value = float(input_row[year])
-                output_value = float(output_row[year])
-                act_eff = output_value / input_value if input_value else ""
-                act_eff_values[year] = act_eff
-            except (ValueError, ZeroDivisionError, KeyError, TypeError):
-                act_eff_values[year] = ""
 
-        # Create a new ACT_EFF row
-        new_row = {col: "" for col in times_df.columns}  # Initialize with empty strings
-        new_row["TechName"] = process_name
-        new_row["Attribute"] = "EFF"
-
-        # Set the values for the years
-        for year, value in act_eff_values.items():
-            new_row[year] = value
-
-        # Insert the new row after the current process's rows
-        updated_times_df = pd.concat(
-            [
-                updated_times_df.iloc[: end_index + 1],  # Rows up to the process
-                pd.DataFrame([new_row]),  # The new ACT_EFF row
-                updated_times_df.iloc[end_index + 1 :],  # Rows after the process
-            ],
-            ignore_index=True,
-        )
-
-        # Clear the year column values for all INPUT and OUTPUT rows
-        for index in input_rows.index:
-            for year in years_columns:
-                updated_times_df.loc[index, year] = ""
-        for index in output_rows.index:
-            for year in years_columns:
-                updated_times_df.loc[index, year] = ""
+        if ceff_rows.empty:
+            # Skip the process if no CEFF row is found
+            # print(f"Missing CEFF for process {process_name}, skipping.")
+            continue
+        else:
+            # Clear the year column values for all INPUT and OUTPUT rows
+            for index in input_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[index, year] = ""
 
     return updated_times_df
 
@@ -954,6 +911,11 @@ process_groups = [
     "hea_cts_t2n_new_technologies",
     "hea_cts_t1e_existing_technologies",
     "hea_cts_t2e_existing_technologies",
+    "hea_saving_technologies",
+    "hea_dh_existing_technologies",
+    "hea_dh_new_technologies",
+    "hea_dh_new_plants",
+    "hea_dh_existing_plants",
 ]
 
 
