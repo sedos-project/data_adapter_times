@@ -45,7 +45,7 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
         ]
 
         comm_grp_str = (
-            "cg_" + "_".join([item[0] for item in cleaned_bracketed_items if item])
+            "cg_" + "_".join([item[3:10] for item in cleaned_bracketed_items if item])
             if cleaned_bracketed_items
             else ""
         )
@@ -83,7 +83,7 @@ def process_data(original_df: pd.DataFrame) -> pd.DataFrame:
 
         comm_grp_str_out = (
             "cg_"
-            + "_".join([item[0] for item in cleaned_output_bracketed_items if item])
+            + "_".join([item[3:10] for item in cleaned_output_bracketed_items if item])
             if cleaned_output_bracketed_items
             else ""
         )
