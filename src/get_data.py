@@ -926,6 +926,8 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                         elif (
                             "availability_timeseries_fixed" in sedos_item
                             or "availability_timeseries_max" in sedos_item
+                            or "demand_annual" in sedos_item
+                            or "demand_timeseries_fixed" in sedos_item
                         ):
                             # temporary fix
                             continue
@@ -1388,6 +1390,16 @@ process_groups = [
     "pow_helper_e",
     "pow_helper_f",
     "pow_helper_g",
+    "pow_exo_demand_a",
+    "pow_exo_demand_b",
+    "pow_exo_demand_c",
+    "pow_exo_demand_d",
+    "pow_exo_demand_de",
+    "pow_exo_demand_e",
+    "pow_exo_demand_f",
+    "pow_exo_demand_g"
+
+
 ]
 # Load the desired units mapping once at the start
 desired_units_mapping = load_desired_units_mapping()

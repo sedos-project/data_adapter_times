@@ -265,6 +265,7 @@ def convert_unit(value, from_unit, to_unit):
             return (1 / (value * factor)), 1
         else:
             factor = get_conversion_factor(from_unit, to_unit)
+            print(f"value: {value}, type: {type(value)}, factor: {factor}, type: {type(factor)}")
             return (value * factor), 0
 
     except UnitConversionError as e:
