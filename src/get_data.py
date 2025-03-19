@@ -1028,9 +1028,17 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                     else:
                                         # If source unit is found, fetch the desired unit
                                         if source_unit:
-                                            desired_unit = desired_units_mapping.get(
-                                                source_unit, None
-                                            )
+                                            if (
+                                                api_col == "potential_annual_max"
+                                                and source_unit == "GWh"
+                                            ):
+                                                desired_unit = "PJ"
+                                            else:
+                                                desired_unit = (
+                                                    desired_units_mapping.get(
+                                                        source_unit, None
+                                                    )
+                                                )
                                             # Only proceed with conversion if the desired unit is found
                                             if desired_unit:
                                                 converted_value, conversion_flag = (
@@ -1134,11 +1142,17 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
                                         else:
                                             # If source unit is found, fetch the desired unit
                                             if source_unit:
-                                                desired_unit = (
-                                                    desired_units_mapping.get(
-                                                        source_unit, None
+                                                if (
+                                                    api_col == "potential_annual_max"
+                                                    and source_unit == "GWh"
+                                                ):
+                                                    desired_unit = "PJ"
+                                                else:
+                                                    desired_unit = (
+                                                        desired_units_mapping.get(
+                                                            source_unit, None
+                                                        )
                                                     )
-                                                )
                                                 # Only proceed with conversion if the desired unit is found
                                                 if desired_unit:
                                                     converted_value, conversion_flag = (
