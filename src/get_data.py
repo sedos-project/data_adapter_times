@@ -345,11 +345,11 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             )
 
             if output_commodity.size > 0:  # Check if array is not empty
-                if "_chp_" in process_name: # or flo_commodity.size > 0:
+                if "_chp_" in process_name:  # or flo_commodity.size > 0:
                     primary_cg = "NRGO"
                 else:
                     # primary_cg = output_commodity[0]
-                    primary_cg = "" # heat sector all processes are OUTPUT based
+                    primary_cg = ""  # heat sector all processes are OUTPUT based
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
@@ -357,11 +357,11 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
             else:
-                if "_chp_" in process_name:#  or flo_commodity.size > 0:
+                if "_chp_" in process_name:  #  or flo_commodity.size > 0:
                     primary_cg = "NRGO"
                 else:
-                    primary_cg = "" # heat sector all processes are OUTPUT based
-                row[primary_cg_col - 1].value =  primary_cg
+                    primary_cg = ""  # heat sector all processes are OUTPUT based
+                row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = "notFound"
@@ -842,6 +842,7 @@ def calculate_act_eff(times_df):
 
         # Find the first INPUT and OUTPUT rows
         input_rows = times_df_filtered[times_df_filtered["Attribute"] == "INPUT"]
+        output_rows = times_df_filtered[times_df_filtered["Attribute"] == "OUTPUT"]
         ceff_rows = times_df_filtered[times_df_filtered["Attribute"] == "CEFF"]
 
         years_columns = [
@@ -856,6 +857,48 @@ def calculate_act_eff(times_df):
             "2060",
             "2070",
         ]
+
+        if (
+            "hea_district_heating_hp_air_HTH_1" in process_name
+            or "hea_district_heating_hp_air_LTH_1" in process_name
+        ):
+            # input_row = input_rows.iloc[0]
+            output_row = output_rows.iloc[0]
+
+            # Calculate ACT_EFF for each year
+            act_eff_values = {}
+            for year in years_columns:
+                try:
+                    input_value = 1
+                    output_value = float(output_row[year])
+                    act_eff_values[year] = (
+                        output_value / input_value if input_value else ""
+                    )
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    act_eff_values[year] = ""
+
+            # Create a new EFF row
+            new_row = {col: "" for col in updated_times_df.columns}
+            new_row["TechName"] = process_name
+            new_row["Attribute"] = "EFF"
+            for year, value in act_eff_values.items():
+                new_row[year] = value
+
+            # Insert the new ACT_EFF row after the process's rows
+            updated_times_df = pd.concat(
+                [
+                    updated_times_df.iloc[: end_index + 1],  # Rows up to the process
+                    pd.DataFrame([new_row]),  # The new ACT_EFF row
+                    updated_times_df.iloc[end_index + 1 :],  # Rows after the process
+                ],
+                ignore_index=True,
+            )
+            for index in input_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[index, year] = ""
+            for index in output_rows.index:
+                for year in years_columns:
+                    updated_times_df.loc[index, year] = ""
 
         if ceff_rows.empty:
             # Skip the process if no CEFF row is found
