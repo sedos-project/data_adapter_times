@@ -567,6 +567,7 @@ def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
             & df["Comm-OUT"].str.startswith("emi_")
             & (df["Comm-OUT"] != "emi_co2_neg_air_dacc")
             & (df["Comm-OUT"] != "emi_co2_neg_imp")
+            & (df["Comm-OUT"] != "emi_co2_neg_air_bio")
         )
     ].copy()
 
