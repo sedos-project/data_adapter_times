@@ -157,7 +157,8 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
 
             # Determine the value to be pasted in the Attribute column
             attribute_value = (
-                "ENV_ACT" if "_p_" in cset_cn or "_proc_" in cset_cn else "FLO_EMIS"
+                "ENV_ACT" if ("_p_" in cset_cn or "_proc_" in cset_cn) 
+                    else ("OUTPUT" if "emi_co2_neg_" in cset_cn else "FLO_EMIS")  
             )
             api_value = extract_single_value(api_value)
             # If there is a value, add it to the worksheet
