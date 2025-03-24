@@ -1742,6 +1742,22 @@ updated_df = calculate_act_eff(updated_df, TIMES_FILE_PATH)
 extract_and_save_actflo_demo_data(
     updated_df, output_file_path="output_data/Scen_tra_actflo.xlsx", sheet_name="INS"
 )
+
+# After obtaining the full units mapping (e.g., in the global variable 'units_mapping')
+ef_units_mapping = {}
+for resource, fields in units_mapping.items():
+    for field in fields:
+        if field["field_name"].startswith("ef_"):
+            ef_units_mapping[field["field_name"]] = field["unit"]
+
+# Save the emission factor units mapping for later use in fill_emission_factors.py
+import pickle
+
+with open("output_data/ef_units_mapping.pkl", "wb") as f:
+    pickle.dump(ef_units_mapping, f)
+print("Emission factor units mapping saved.")
+
+# Save the updated DataFrame
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, updated_units_mapping)
 update_process_list_sheet(TIMES_FILE_PATH, updated_units_mapping)
