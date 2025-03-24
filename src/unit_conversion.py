@@ -21,6 +21,7 @@ def define_energy_model_units():
     scaled_unit("day", "h", 24)
     scaled_unit("a", "day", 365)
 
+    scaled_unit("kg", "g", 1e3)
     scaled_unit("t", "kg", 1e3)
     scaled_unit("kt", "t", 1e3)
     scaled_unit("Mt", "kt", 1e3)
@@ -70,6 +71,8 @@ def define_energy_model_units():
     scaled_unit("Tvehicles", "Gvehicles", 1e3)
 
     scaled_unit("PJ", "J", 1e15)
+    scaled_unit("GJ", "J", 1e9)
+    scaled_unit("TJ", "J", 1e12)
     scaled_unit("kWh", "J", 3.6e6)  # 1 kWh = 3.6e6 Joules
     scaled_unit("kWh", "PJ", 3.6e-9)
 
@@ -219,11 +222,12 @@ def define_energy_model_units():
     NamedComposedUnit("Kt/PJ", unit("kt") / unit("PJ"))
     NamedComposedUnit("kt/PJ", unit("kt") / unit("PJ"))
     NamedComposedUnit("Mt/PJ", unit("Mt") / unit("PJ"))
+    NamedComposedUnit("g/GJ", unit("g") / unit("GJ"))
+    NamedComposedUnit("t/TJ", unit("t") / unit("TJ"))
 
     NamedComposedUnit("PJ/Million units", unit("PJ") / unit("M_units"))
     NamedComposedUnit("PJ/M_units", unit("PJ") / unit("M_units"))
     NamedComposedUnit("PJ/Mt", unit("PJ") / unit("Mt"))
-    NamedComposedUnit("PJ/kt", unit("PJ") / unit("kt"))
 
     NamedComposedUnit("kWh/100km", unit("kWh") / unit("100km"))
     NamedComposedUnit("kWh/km", unit("kWh") / unit("km"))

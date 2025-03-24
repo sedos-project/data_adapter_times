@@ -413,7 +413,9 @@ def add_process_sheet_to_workbook(file_path, processed_df):
         tech_name = row["TechName"]
         output_commodities = row["Comm-OUT"]
         if "import" in tech_name.lower():
-            process_sets[tech_name] = "PRE"  # need to change from IMP to PRE, becasue of emi_co2_neg_air_bio as output for some import process
+            process_sets[tech_name] = (
+                "PRE"  # need to change from IMP to PRE, becasue of emi_co2_neg_air_bio as output for some import process
+            )
         elif (
             "x2x_g2p_pemfc_ls_1" in tech_name.lower()
             or "x2x_g2p_sofc_ls_1" in tech_name.lower()

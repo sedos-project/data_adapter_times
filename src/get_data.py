@@ -380,13 +380,10 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     or "_biogas_treatment" in process_name
                     or "_aec_" in process_name
                     or "_pemec_" in process_name
-                    #or "_soec_" in process_name
+                    # or "_soec_" in process_name
                 ):
                     primary_cg = "NRGI"
-                elif (
-                    "_soec_" in process_name
-                    or "_coel_" in process_name
-                ):
+                elif "_soec_" in process_name or "_coel_" in process_name:
                     primary_cg = "sec_elec"
                 elif "_x2liquid_ft_" in process_name:
                     primary_cg = "sec_syngas"
@@ -414,13 +411,10 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     or "_biogas_treatment" in process_name
                     or "_aec_" in process_name
                     or "_pemec_" in process_name
-                    #or "_soec_" in process_name
+                    # or "_soec_" in process_name
                 ):
                     primary_cg = "NRGI"
-                elif (
-                    "_soec_" in process_name
-                    or "_coel_" in process_name
-                ):
+                elif "_soec_" in process_name or "_coel_" in process_name:
                     primary_cg = "sec_elec"
                 elif "_x2liquid_ft_" in process_name:
                     primary_cg = "sec_syngas"
@@ -1296,11 +1290,15 @@ def calculate_act_eff(times_df):
         act_eff_row = act_eff_rows.iloc[0]
         act_eff_index = act_eff_rows.index[0]
 
-        # Calculate new ACT_EFF values 
+        # Calculate new ACT_EFF values
         for year in years_columns:
             # input based process directly takes primary input value as ACT_EFF
             # "x2x_x2liquid_oref_0", "x2x_x2liquid_oref_1", "x2x_x2liquid_ft_1"
-            if process in ["x2x_x2liquid_oref_0", "x2x_x2liquid_oref_1", "x2x_x2liquid_ft_1"]:
+            if process in [
+                "x2x_x2liquid_oref_0",
+                "x2x_x2liquid_oref_1",
+                "x2x_x2liquid_ft_1",
+            ]:
                 try:
                     input_value = float(input_row[year])
                     act_eff_value = float(act_eff_row[year])
@@ -1341,8 +1339,13 @@ def calculate_act_eff(times_df):
     # Here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_elec")
     # here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_syngas_sr" or "sec_hydrogen_orig")
     # divided by the first INPUT row's value.
-    specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1", 
-                          "x2x_x2gas_sr_syngas_psa_0", "x2x_x2gas_sr_syngas_psa_1", "x2x_other_biogas_treatment"]
+    specific_processes = [
+        "x2x_g2p_pemfc_ls_1",
+        "x2x_g2p_sofc_ls_1",
+        "x2x_x2gas_sr_syngas_psa_0",
+        "x2x_x2gas_sr_syngas_psa_1",
+        "x2x_other_biogas_treatment",
+    ]
     specific_process_positions = []
     for process_name in specific_processes:
         process_df = times_df[times_df["TechName"] == process_name]
@@ -1361,8 +1364,12 @@ def calculate_act_eff(times_df):
         input_rows = process_subset[process_subset["Attribute"] == "INPUT"]
         output_rows = process_subset[
             (process_subset["Attribute"] == "OUTPUT")
-            & ((process_subset["Comm-OUT"] == "sec_elec") | (process_subset["Comm-OUT"] == "sec_syngas_sr") |
-               (process_subset["Comm-OUT"] == "sec_hydrogen_orig") | (process_subset["Comm-OUT"] == "sec_methane_orig"))
+            & (
+                (process_subset["Comm-OUT"] == "sec_elec")
+                | (process_subset["Comm-OUT"] == "sec_syngas_sr")
+                | (process_subset["Comm-OUT"] == "sec_hydrogen_orig")
+                | (process_subset["Comm-OUT"] == "sec_methane_orig")
+            )
         ]
 
         if input_rows.empty or output_rows.empty:
@@ -1430,7 +1437,7 @@ def calculate_act_eff(times_df):
         # clear output rows
         for index in output_rows.index:
             for year in years_columns:
-                updated_times_df.loc[index, year] = ""            
+                updated_times_df.loc[index, year] = ""
 
     return updated_times_df
 
@@ -1477,6 +1484,21 @@ for process in x2x_processes:
 
 # Apply ACT_EFF calculation
 updated_df = calculate_act_eff(updated_df)
+
+# After obtaining the full units mapping (e.g., in the global variable 'units_mapping')
+ef_units_mapping = {}
+for resource, fields in units_mapping.items():
+    for field in fields:
+        if field["field_name"].startswith("ef_"):
+            ef_units_mapping[field["field_name"]] = field["unit"]
+
+# Save the emission factor units mapping for later use in fill_emission_factors.py
+import pickle
+
+with open("output_data/ef_units_mapping.pkl", "wb") as f:
+    pickle.dump(ef_units_mapping, f)
+print("Emission factor units mapping saved.")
+
 # Save the updated DataFrame
 format_and_save_excel(TIMES_FILE_PATH, updated_df)
 update_commodity_list_units(TIMES_FILE_PATH, updated_units_mapping)
