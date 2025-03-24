@@ -631,9 +631,15 @@ def filter_output_with_emi_commodities(df: pd.DataFrame) -> pd.DataFrame:
     """
     # Filter out rows where 'Attribute' is 'OUTPUT' and 'Comm-OUT' starts with 'emi_'
     filtered_df = df[
-        ~((df["Attribute"] == "OUTPUT") & df["Comm-OUT"].str.startswith("emi_"))
+        ~(
+            (df["Attribute"] == "OUTPUT")
+            & df["Comm-OUT"].str.startswith("emi_")
+            # & (df["Comm-OUT"] != "emi_co2_neg_air_bio")
+            # & (df["Comm-OUT"] != "emi_co2_neg_imp")
+            & ~(df["Comm-OUT"].str.contains("emi_co2_neg_air_bio", na=False))
+            & ~(df["Comm-OUT"].str.contains("emi_co2_neg_imp", na=False))
+        )
     ].copy()
-
     return filtered_df
 
 
