@@ -471,6 +471,15 @@ def data_mapping(times_df, process_name, is_group=False):
         process_name,
     )
 
+    if not api_process_data.empty:
+        # Check if 'version' column exists before filtering
+        if "version" in api_process_data.columns:
+            api_process_data = api_process_data[
+                api_process_data["version"] == "srd_point_sedos"
+            ]
+        else:
+            print(f"'version' column not found in the {process_name} process data.")
+
     if api_process_data.empty:
         return times_df  # Return the original DataFrame if no data is fetched
 
