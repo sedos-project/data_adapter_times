@@ -1,5 +1,8 @@
 import pandas as pd
 import requests
+from unit_conversion import convert_unit
+from openpyxl import load_workbook
+import pickle
 from openpyxl import load_workbook
 
 # Define the file path for output
@@ -114,7 +117,7 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
     ws (openpyxl.worksheet.worksheet.Worksheet): The worksheet to update.
     """
     global start_row  # Use a global start_row to keep appending correctly
-
+    conversion_errors = []
     if api_data.empty:
         print(f"No emission factors found for process {process_name}")
         return
@@ -154,6 +157,62 @@ def process_emission_factors(api_data, process_name, col_indices, ws):
                             if not global_emission_data[remaining_string].empty
                             else None
                         )
+            else:
+                # Else: perform unit conversion using the desired unit from the XLSX mapping
+                # Load the desired unit mapping from the XLSX (similar to get_data.py)
+                def load_desired_units_mapping(
+                    file_path="config_data/units_mapping_pow.xlsx",
+                ):
+                    wb = load_workbook(file_path, data_only=True)
+                    if "Unique Units" not in wb.sheetnames:
+                        print("Unique Units sheet not found in the Excel file.")
+                        return {}
+                    ws = wb["Unique Units"]
+                    mapping = {}
+                    for row in ws.iter_rows(min_row=2, values_only=True):
+                        src_unit, desired_unit = row
+                        if src_unit and desired_unit:
+                            mapping[src_unit] = desired_unit
+                    return mapping
+
+                desired_units_mapping = load_desired_units_mapping()
+
+                # Load a pre-saved mapping for emission factor fields (created in get_data.py)
+                try:
+                    with open("output_data/ef_units_mapping.pkl", "rb") as f:
+                        ef_units_mapping = pickle.load(f)
+                except Exception as e:
+                    print(f"Error loading emission factor units mapping: {e}")
+                    ef_units_mapping = {}
+
+                # Use the API column name as the key (adjust if needed)
+                field_key = api_col
+                if field_key in ef_units_mapping:
+                    source_unit = ef_units_mapping[field_key]
+                    # Get the desired unit from the XLSX mapping
+                    desired_unit = desired_units_mapping.get(source_unit, source_unit)
+                    if api_value is not None:
+                        try:
+                            converted_value, conversion_flag = convert_unit(
+                                float(api_value), source_unit, desired_unit
+                            )
+                            api_value = converted_value
+                        except Exception as e:
+                            error_message = f"Unit conversion error for {api_col}: {e}"
+                            print(error_message)
+                            conversion_errors.append(error_message)
+                    else:
+                        error_message = f"API value is None for {api_col} in process {process_name}, using original value."
+                        print(error_message)
+                        conversion_errors.append(error_message)
+                else:
+                    error_message = f"No source unit mapping found for {api_col}, {source_unit} using original value."
+                    print(error_message)
+                    conversion_errors.append(error_message)
+
+            with open("output_data/conversion_errors.log", "a") as log_file:
+                for message in conversion_errors:
+                    log_file.write(message + "\n")
 
             # Determine the value to be pasted in the Attribute column
             attribute_value = (
@@ -218,6 +277,10 @@ def process_group_or_individual(process_name, ws, is_group=False):
         # If it's a process group, handle the data by splitting on 'type'
         process_groups = api_data.groupby("type")
         for process, group_data in process_groups:
+            # Skip processes starting with any prefix in ignore_prefixes
+            if process.startswith(ignore_prefixes):
+                continue
+
             if process.endswith("_ag") and not process.startswith(
                 allowed_prefixes_for_ag
             ):  # Skip processes ending with _ag but not those starting with the allowed prefixes
@@ -235,6 +298,70 @@ def process_group_or_individual(process_name, ws, is_group=False):
 def main():
     global start_row  # Declare global so it can be used across functions
     global global_emission_data  # Declare global emission data variable
+    global ignore_prefixes  # Declare global ignore prefixes
+
+    ignore_prefixes = (
+        "al_",
+        "at_",
+        "ba_",
+        "be_",
+        "bg_",
+        "ch_",
+        "cy_",
+        "cz_",
+        "de_at_",
+        "de_be_",
+        "de_ch_",
+        "de_cz_",
+        "de_dk_",
+        "de_fr_",
+        "de_lu_",
+        "de_nl_",
+        "de_no_",
+        "de_pl_",
+        "de_se_",
+        "de_uk_",
+        "dz_ma_",
+        "dz_tn_",
+        "dk_",
+        "ee_",
+        "eg_",
+        "es_",
+        "fi_",
+        "fr_",
+        "gb_",
+        "gr_",
+        "hr_",
+        "hu_",
+        "ie_",
+        "is_",
+        "it_",
+        "lu_",
+        "lv_",
+        "me_",
+        "mk_",
+        "nl_",
+        "no_",
+        "pl_",
+        "pt_",
+        "ro_",
+        "rs_",
+        "se_",
+        "si_",
+        "sk_",
+        "il_",
+        "lt_",
+        "ly_",
+        "ma_",
+        "md_",
+        "mt_",
+        "ps_",
+        "tn_",
+        "tr_",
+        "ua_",
+        "uk_",
+        "xk_",
+    )
 
     # Fetch the global emission data once
     global_emission_url = "https://openenergyplatform.org/api/v0/schema/model_draft/tables/global_emission_factors/rows"
@@ -296,7 +423,11 @@ def main():
         process
         for process in pow_processes
         if not (
-            process.endswith("_ag") and not process.startswith(allowed_prefixes_for_ag)
+            process.startswith(ignore_prefixes)
+            or (
+                process.endswith("_ag")
+                and not process.startswith(allowed_prefixes_for_ag)
+            )
         )
     ]
 
