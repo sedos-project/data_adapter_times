@@ -358,6 +358,16 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         if techname_cell.value:
             process_name = techname_cell.value.strip()
 
+            # Define the substrings that should trigger "PJ"
+            tcap_keywords = ["_delivery_", "_import_"]
+
+            if any(keyword in process_name for keyword in tcap_keywords):
+                row[tcap_col - 1].value = "PJ"
+            elif "_storage_" in process_name:
+                row[tcap_col - 1].value = "GWh"
+            else:
+                row[tcap_col - 1].value = ""
+
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
 
@@ -402,7 +412,12 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                             == f"conversion_factor_{primary_cg_temp}"
                         ):
                             if field["unit"]:
-                                row[tact_col - 1].value = field["unit"]
+                                if field["unit"] in "MWh/MWh":
+                                    row[tact_col - 1].value = "PJ"
+                                elif field["unit"] in "t/t":
+                                    row[tact_col - 1].value = "kt"
+                                else:
+                                    row[tact_col - 1].value = field["unit"]
             else:
                 if process_name in ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]:
                     primary_cg = "NRGO"

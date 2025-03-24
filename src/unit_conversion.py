@@ -228,6 +228,7 @@ def define_energy_model_units():
     NamedComposedUnit("PJ/Million units", unit("PJ") / unit("M_units"))
     NamedComposedUnit("PJ/M_units", unit("PJ") / unit("M_units"))
     NamedComposedUnit("PJ/Mt", unit("PJ") / unit("Mt"))
+    NamedComposedUnit("PJ/kt", unit("PJ") / unit("kt"))
 
     NamedComposedUnit("kWh/100km", unit("kWh") / unit("100km"))
     NamedComposedUnit("kWh/km", unit("kWh") / unit("km"))
