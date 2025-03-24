@@ -377,7 +377,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 elif (
                     "_oref_" in process_name
-                    or "healper_tra_ind" in process_name
+                    or "helper_ind_tra_" in process_name
                 ):
                     primary_cg = "NRGI"
                 else:
@@ -401,7 +401,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                     primary_cg = "NRGO"
                 elif (
                     "_oref_" in process_name
-                    or "healper_tra_ind" in process_name
+                    or "helper_ind_tra_" in process_name
                 ):
                     primary_cg = "NRGI"
                 else:
