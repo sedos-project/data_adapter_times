@@ -1342,7 +1342,7 @@ def calculate_act_eff(times_df):
     # here, we calculate ACT_EFF as the first OUTPUT row's value (with Comm-OUT "sec_syngas_sr" or "sec_hydrogen_orig")
     # divided by the first INPUT row's value.
     specific_processes = ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1", 
-                          "x2x_x2gas_sr_syngas_psa_0", "x2x_x2gas_sr_syngas_psa_1"]
+                          "x2x_x2gas_sr_syngas_psa_0", "x2x_x2gas_sr_syngas_psa_1", "x2x_other_biogas_treatment"]
     specific_process_positions = []
     for process_name in specific_processes:
         process_df = times_df[times_df["TechName"] == process_name]
@@ -1362,7 +1362,7 @@ def calculate_act_eff(times_df):
         output_rows = process_subset[
             (process_subset["Attribute"] == "OUTPUT")
             & ((process_subset["Comm-OUT"] == "sec_elec") | (process_subset["Comm-OUT"] == "sec_syngas_sr") |
-               (process_subset["Comm-OUT"] == "sec_hydrogen_orig"))
+               (process_subset["Comm-OUT"] == "sec_hydrogen_orig") | (process_subset["Comm-OUT"] == "sec_methane_orig"))
         ]
 
         if input_rows.empty or output_rows.empty:
