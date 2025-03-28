@@ -359,14 +359,16 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             process_name = techname_cell.value.strip()
 
             # Define the substrings that should trigger "PJ"
-            tcap_keywords = ["_delivery_", "_import_"]
+            tcap_keywords = ["_delivery_", "_import_", "_source_", "_other_"]
 
-            if any(keyword in process_name for keyword in tcap_keywords):
+            if any(keyword in process_name for keyword in tcap_keywords) and "_pipeline_" not in process_name and "_dac_" not in process_name:
                 row[tcap_col - 1].value = "PJ"
             elif "_storage_" in process_name:
                 row[tcap_col - 1].value = "GWh"
+            elif "_dac_" in process_name:
+                row[tcap_col - 1].value = "Kt"
             else:
-                row[tcap_col - 1].value = ""
+                row[tcap_col - 1].value = "GW"
 
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
