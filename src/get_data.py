@@ -309,8 +309,10 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                             == comm_name.strip().lower()
                         ):
                             unit_cell = row[unit_col - 1]
-                            if field_unit in "MWh/MWh":
+                            if field_unit in ["MWh/MWh", "PJ/PJ"]:
                                 unit_cell.value = "PJ"
+                            elif field_unit in ["t/MWh", "t/t"]:
+                                 unit_cell.value = "Kt"
                             else:    
                                 unit_cell.value = field_unit
                             found = True
