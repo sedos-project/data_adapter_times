@@ -251,6 +251,7 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                 commname_cell = row[commname_col - 1]  # openpyxl columns are 1-based
                 if commname_cell.value and isinstance(commname_cell.value, str):
                     commname = commname_cell.value.strip().lower()
+                    unit_cell = row[unit_col - 1]
                     # Check if "_elec_" or other boundary conditions exist
                     if (
                         "_elec_" in commname
@@ -260,9 +261,31 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                     ):
                         ctype_cell = row[ctype_col - 1]
                         ctype_cell.value = "ELC"
+                    
+                    comm_unit_pj = ["pump_", "pri_", "sec_", "_heat", "machine", 
+                                    "iip_elec", "_lighting", "_coke_","_ict","_cooling", "exo_other_ind"] # list of commodity with PJ unit
+                    # add unit for commodities which field_unit is empty
+                    if  commname.startswith("emi_"):
+                        unit_cell.value = "Kt"
+                    if any(keyword in commname for keyword in comm_unit_pj):
+                        unit_cell.value = "PJ"
+                    if "exo_agri_" in commname:
+                        unit_cell.value = "Million units"
+
+
                     if commname_cell.value.strip().lower() == comm_name.strip().lower():
                         unit_cell = row[unit_col - 1]
-                        unit_cell.value = field_unit
+                        if field_unit in ["Million units", "Million units/Million units"]:
+                            unit_cell.value = "Million units"
+                        elif field_unit in ["Mt/Mt", "Mt", "PJ, Mt"]:
+                            unit_cell.value = "Mt"
+                        elif field_unit in ["Kt/Mt"] and "emi_co2_reusable" not in commname:
+                            unit_cell.value = "Mt"
+                        elif field_unit in ["PJ/Mt", "PJ", "PJ/Million units", "PJ/PJ"]:
+                            unit_cell.value = "PJ"
+                
+                        else:    
+                            unit_cell.value = field_unit
                         found = True
                         break  # Assuming CommName is unique
             if not found:
@@ -299,6 +322,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
     vintage_col = headers.get("Vintage")
     primary_cg_col = headers.get("PrimaryCG")
     tact_col = headers.get("Tact")
+    tcap_col = headers.get("Tcap")
 
     if not (techname_col and vintage_col and primary_cg_col and tact_col):
         print("Some required columns are missing in 'Process List' sheet.")
@@ -309,6 +333,25 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         techname_cell = row[techname_col - 1]
         if techname_cell.value:
             process_name = techname_cell.value.strip()
+
+             # Define the substrings that should trigger "Mt"
+            tcap_keywords_Mt = ["_aluminum_", "_cement_", "chemical_btx", "chemical_cl2", "_mhydr_", "_msynth_", "nh3_hb", "_chemical_olefins_",
+                                "_copper_", "_glass_", "_paper_", "_steel_"]
+            # Define the substrings that should trigger "GW"
+            tcap_keywords_GW = ["automobile_boiler", "automobile_furnace", "automobile_heatexchanger", "automobile_hvlt", "automobile_mcmp",
+                                "_heatpump_", "autoproducer","_aec_", "_biog_", "_mpyr_", "_pemec_", "_pox_", "_smr_", "_soec_", "chemical_process_heat",
+                                 "chemical_steam", "other_cool",  "other_heat_pump", "other_heatexchanger", "ind_boiler", "other_pump",
+                                  "other_solar", "other_steam" ]
+            tcap_keywords_Million_units = ["automobile_hcv", "automobile_lcv", "automobile_pc", "_agri_"]
+
+            if any(keyword in process_name for keyword in tcap_keywords_Mt) and not any(excluded in process_name for excluded in ["autoproducer", "_heat_exchanger_", "_coke_plant_"]):
+                row[tcap_col - 1].value = "Mt"
+            elif any(keyword in process_name for keyword in tcap_keywords_GW):
+                row[tcap_col - 1].value = "GW"
+            elif any(keyword in process_name for keyword in tcap_keywords_Million_units):
+                row[tcap_col - 1].value = "Million units"           
+            else:
+                row[tcap_col - 1].value = "PJ"
 
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
@@ -334,12 +377,27 @@ def update_process_list_sheet(excel_file_path, units_mapping):
 
                 else:
                     primary_cg = output_commodity[0]
+
                 row[primary_cg_col - 1].value = primary_cg
 
-                # Set Tact to the unit from Commodity List
-                row[tact_col - 1].value = units_mapping.get(
+                # Set Tact to the unit from unit_mapping
+                temp_unit = units_mapping.get(
                     f"conversion_factor_{primary_cg}", "notFound"
                 )
+                if temp_unit  in ["PJ/Mt", "PJ/Million units", "PJ/PJ"]:
+                    row[tact_col - 1].value = "PJ"
+                elif temp_unit in ["Mt/Mt", "PJ, Mt"]:
+                    row[tact_col - 1].value = "Mt"
+                elif temp_unit in "Kt/Mt" and "biog_tra" not in process_name:
+                    row[tact_col - 1].value = "Mt"
+                elif "biog_tra" in process_name:
+                    row[tact_col - 1].value = "Mt"
+                elif temp_unit in "Million units/Million units" or "_agri_" in process_name:
+                    row[tact_col - 1].value = "Million units"
+                else:
+                    row[tact_col - 1].value = "PJ"
+
+            
 
     # Save the workbook
     wb.save(excel_file_path)
