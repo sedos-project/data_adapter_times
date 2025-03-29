@@ -304,6 +304,10 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                         ):
                             ctype_cell = row[ctype_col - 1]
                             ctype_cell.value = "HTHEAT"
+                        # commidty unit based on commodity name
+                        unit_cell = row[unit_col - 1]
+                        if "emi_" in commname:
+                            unit_cell.value = "Kt"
                         if (
                             commname_cell.value.strip().lower()
                             == comm_name.strip().lower()
@@ -359,7 +363,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
 
     # Set Vintage column to 'NO' and populate PrimaryCG, Tact, and TCap
     for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
-        techname_cell = row[techname_col - 1]
+        techname_cell = row[techname_col - 1] 
         if techname_cell.value:
             process_name = techname_cell.value.strip()
 
