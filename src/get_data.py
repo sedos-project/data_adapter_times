@@ -266,11 +266,15 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                         ):
                             ctype_cell = row[ctype_col - 1]
                             ctype_cell.value = "ELC"
+                        # unit by commodity name
+                        unit_cell = row[unit_col - 1]
+                        if "emi_" in commname:
+                            unit_cell.value = "Kt"
                         if (
                             commname_cell.value.strip().lower()
                             == comm_name.strip().lower()
                         ):
-                            unit_cell = row[unit_col - 1]
+                            unit_cell = row[unit_col - 1]                               
                             unit_cell.value = field_unit
                             found = True
                             break  # Assuming CommName is unique
@@ -319,6 +323,15 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         techname_cell = row[techname_col - 1]
         if techname_cell.value:
             process_name = techname_cell.value.strip()
+            # Define the substrings that should trigger "PJ"
+            tcap_keywords = ["_source_", "_import_"]
+
+            if any(keyword in process_name for keyword in tcap_keywords):
+                row[tcap_col - 1].value = "PJ"
+            elif "_savings_" in process_name:
+                row[tcap_col - 1].value = "PJ"
+            else:
+                row[tcap_col - 1].value = "GW"
 
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
@@ -354,7 +367,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
 
                 # Set Tact to the unit from Commodity List
                 row[tact_col - 1].value = units_mapping.get(
-                    f"conversion_factor_{primary_cg}", "notFound"
+                    f"conversion_factor_{primary_cg}", "PJ"
                 )
             else:
                 if "_chp_" in process_name:  #  or flo_commodity.size > 0:
@@ -364,7 +377,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
-                row[tact_col - 1].value = "notFound"
+                row[tact_col - 1].value = "PJ"
 
     # Save the workbook
     wb.save(excel_file_path)
