@@ -309,7 +309,14 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                             == comm_name.strip().lower()
                         ):
                             unit_cell = row[unit_col - 1]
-                            unit_cell.value = field_unit
+                            if field_unit in ["Kt/Kt", "Kt", "PJ, Mt", "kt/Kt"]:
+                                unit_cell.value = "Kt"
+                            elif field_unit in ["Mt/Mt"]:
+                                unit_cell.value = "Mt"
+                            elif field_unit in ["MWh", "PJ", "PJ/Mt", "PJ/PJ"]:
+                                unit_cell.value = "PJ"
+                            else:
+                                unit_cell.value = field_unit
                             found = True
                             break  # Assuming CommName is unique
                 if not found:
@@ -358,6 +365,13 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         if techname_cell.value:
             process_name = techname_cell.value.strip()
 
+            if "_storage_" in process_name and "_co2_" not in process_name:
+                row[tcap_col - 1].value = "GWh"
+            elif "_co2_" in process_name:
+                row[tcap_col - 1].value = "Kt"
+            else:
+                row[tcap_col - 1].value = "PJ"
+
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
 
@@ -398,7 +412,12 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                             == f"conversion_factor_{primary_cg_temp}"
                         ):
                             if field["unit"]:
-                                row[tact_col - 1].value = field["unit"]
+                                if field["unit"] in ["MWh/MWh", "PJ/PJ", "PJ", "PJ/Mt", "MWh", "notFound"]:
+                                    row[tact_col - 1].value = "PJ"
+                                elif field["unit"] in ["Kt/Kt", "Kt"]:
+                                    row[tact_col - 1].value = "kt"
+                                else:
+                                    row[tact_col - 1].value = field["unit"]
             else:
                 if process_name in ["x2x_g2p_pemfc_ls_1", "x2x_g2p_sofc_ls_1"]:
                     primary_cg = "NRGO"
@@ -415,13 +434,13 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
-                row[tact_col - 1].value = "notFound"
+                row[tact_col - 1].value = "PJ"
 
     # Additional check: Ensure that every cell in the Tact column has a value
     for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
         tact_cell = row[tact_col - 1]
         if tact_cell.value is None or tact_cell.value == "":
-            tact_cell.value = "notFound"
+            tact_cell.value = "PJ"
 
     # Save the workbook
     wb.save(excel_file_path)
@@ -1169,7 +1188,7 @@ def data_mapping_internal(times_df, process_name, api_process_data, metadata, gr
     # Implement CAP2ACT logic
     cap2act_value = 1  # Default to empty if no match is found
 
-    if "storage" in process_name.lower():
+    if "storage" in process_name.lower() and "co2_storage" not in process_name:
         cap2act_value = (
             0.0036  # Set CAP2ACT to 0.0036 if process name contains "battery"
         )
