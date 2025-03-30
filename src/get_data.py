@@ -282,12 +282,24 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                 for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
                     commname_cell = row[commname_col - 1]
                     if commname_cell.value and isinstance(commname_cell.value, str):
+                        commname = commname_cell.value.strip().lower()
+                        unit_cell = row[unit_col - 1]
+                        # unit based on commodity list
+                        if "emi" in commname:
+                            unit_cell.value = "Kt"
                         if (
                             commname_cell.value.strip().lower()
                             == comm_name.strip().lower()
                         ):
                             unit_cell = row[unit_col - 1]
-                            unit_cell.value = field_unit
+                            if field_unit in ["km/PJ", "kWh"]:
+                                unit_cell.value = "PJ"
+                            elif field_unit in ["pkm", "Bpkm/PJ"]:
+                                unit_cell.value = "BPkm"
+                            elif field_unit in ["tkm", "Btkm/PJ"]:
+                                unit_cell.value = "Btkm"
+                            else:
+                                unit_cell.value = field_unit
                             found = True
                             break  # Assuming CommName is unique
                 if not found:
@@ -336,6 +348,10 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         if techname_cell.value:
             process_name = techname_cell.value.strip()
 
+            if "_wallbox_" in process_name:
+                row[tcap_col - 1].value = "GW"
+            elif "_battery_" in process_name:
+                row[tcap_col - 1].value = "GWh"
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
 
@@ -368,16 +384,31 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                             == f"conversion_factor_{primary_cg_temp}"
                         ):
                             if field["unit"]:
-                                row[tact_col - 1].value = field["unit"]
-                            else:
-                                row[tact_col - 1].value = "notFound"
+                                if field["unit"] in ["kWh", "km/PJ"]:
+                                    row[tact_col - 1].value = "PJ"
+                                else:
+                                    row[tact_col - 1].value = field["unit"]
                             break
 
                 # Additional logic for DEMO
                 if primary_cg == "DEMO":
-                    row[tact_col - 1].value = "BPkm"
-                    # Set TCap to 'Vehicle unit' if available
-                    row[tcap_col - 1].value = "Vehicle unit"
+                    if "_pass_" in process_name:
+                        row[tact_col - 1].value = "BPkm"
+                        # Set TCap to 'Vehicle unit' if available
+                        row[tcap_col - 1].value = "Vehicle unit"
+                    elif "_frei_" in process_name:
+                        row[tact_col - 1].value = "Btkm"
+                        # Set TCap to 'Vehicle unit' if available
+                        row[tcap_col - 1].value = "Vehicle unit"
+                    elif "_agri_" in process_name:
+                        row[tact_col - 1].value = "PJ"
+                        row[tcap_col - 1].value = "PJ"
+
+                    elif "_const_" in process_name:
+                        row[tact_col - 1].value = "PJ"
+                        row[tcap_col - 1].value = "PJ"
+
+                    
 
     wb.save(excel_file_path)
     print("Process List sheet updated with Vintage, PrimaryCG, and Tact columns.")
