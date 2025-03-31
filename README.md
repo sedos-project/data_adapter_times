@@ -111,7 +111,7 @@ The ``/config_data/`` folder contains the configuration files required for runni
 
 ### 3. `fill_emission_factors.py`
 - **Purpose**:
-  - Calculates and fills emission factors for processes.
+  - Extracts and fills emission factors for processes.
   - Converts units as needed and integrates emission data into the final output.
 
 - **Key Functions**:
@@ -173,8 +173,8 @@ The ``/input_data/`` folder should contain the following file:
 
 The ``/output_data/`` folder will contain the following output files after running the scripts:
 
-``Scen_emission_all_{sector}.xlsx``: Contains aggregated emission data for the scenarios.
-``vt_DE_Demand_{sector}.xlsx``: Contains aggregated demand data for the sector.
+``Scen_emission_all_{sector}.xlsx``: Contains emission data for the scenarios.
+``vt_DE_Demand_{sector}.xlsx``: Contains demand data for the sector.
 ``vt_DE_{sector}.xlsx``: This is the main output file for the process data. These are sector-specific files for heating, industry, transportation, and cross-sector processes.
 ``times_df_{sector}.pkl``: Intermediate Pickle files that hold data frames generated during the processing.
 ``ef_units_mapping.pkl``: Intermediate Pickle files that hold units mapping with source and destination unit for the exo outputs required in emission factors calculation.
