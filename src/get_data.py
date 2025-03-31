@@ -343,7 +343,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         return
 
     # Set Vintage column to 'NO' and populate PrimaryCG, Tact, and TCap
-    for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
+    for row in ws_process_list.iter_rows(min_row=header_row + 2, values_only=False):
         techname_cell = row[techname_col - 1]
         if techname_cell.value:
             process_name = techname_cell.value.strip()
