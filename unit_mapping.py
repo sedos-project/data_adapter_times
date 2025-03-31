@@ -25,6 +25,19 @@ def process_multiple_excels(input_folder, output_file):
     # Concatenate all data
     final_commodity_df = pd.concat(all_commodity_data, ignore_index=True)
     final_process_df = pd.concat(all_process_data, ignore_index=True)
+
+    # Add the CO2 equivalent entry to commodities
+    co2_eq_entry = pd.DataFrame({'commodity': ['emi_co2_eq'], 'unit': ['Kt']})
+    final_commodity_df = pd.concat([final_commodity_df, co2_eq_entry], ignore_index=True)
+
+    for index, row in final_commodity_df.iterrows():
+        # Check if the unit is empty/null and commodity starts with sec_ or pri_
+        if (pd.isna(row['unit']) or row['unit'] == '') and \
+           (row['commodity'].startswith('sec_') or row['commodity'].startswith('pri_')):
+            final_commodity_df.at[index, 'unit'] = 'PJ' 
+    
+    # Remove duplicates if necessary
+    final_commodity_df = final_commodity_df.drop_duplicates(subset=['commodity', 'unit']).reset_index(drop=True)
     
     # Write to new Excel file
     with pd.ExcelWriter(output_file) as writer:
@@ -32,7 +45,7 @@ def process_multiple_excels(input_folder, output_file):
         final_process_df.to_excel(writer, sheet_name='SEDOS_process', index=False)
 
 # Example usage
-input_folder = "input_excels"  # Replace with the actual folder path
-output_excel_file = "result_unit_mapping.xlsx"  # Output file name
+input_folder = "data_adapter_times/input_excels"  # Replace with the actual folder path
+output_excel_file = "data_adapter_times/result_unit/result_unit_mapping.xlsx"  # Output file name
 process_multiple_excels(input_folder, output_excel_file)
 print(f"Processed data saved to {output_excel_file}")

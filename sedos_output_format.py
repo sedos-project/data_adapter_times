@@ -6,14 +6,10 @@ import json
 
 
 # input file location, location that contains .vd files
-input_folder_path = "results_vd" 
-output_folder_path = "results_csv"
-# result_files = [
-#     input_folder_path + 'tokio_1511.vd',
-#     input_folder_path + 'riga_1511.vd'
-# ]
+input_folder_path = "data_adapter_times/results_vd" 
+output_folder_path = "data_adapter_times/results_csv"
 
-result_files = ['tokio_w_ghg-cap_2703.vd']
+result_files = ['tokio_w_ghg-cap_2703.vd'] # list of result file names
 
 
 # Prepare .vd file into dataframe
@@ -141,16 +137,28 @@ sedos_result_df.head()
 
 for index, row in sedos_result_df.iterrows():
     
-    # extract the number at the end of the process
+    # Extract the number at the end of the process
     match = re.search(r'_(\d+)$', row['process'])
-    if match: # if there is any number at the end
-        print(match)
-        # end with any number other than 0
-        if int(match.group(1)) != 0:
-            sedos_result_df.at[index, 'new'] = '1'
+    if match:
+        # Get the matched number
+        number = match.group(1)
+        
+        # Check if it's a single digit (like _0 or _1)
+        if len(number) == 1:
+            if number == '0':
+                sedos_result_df.at[index, 'new'] = '0'
+            else:
+                sedos_result_df.at[index, 'new'] = '1'
+        # Check if it's a multi-digit number
         else:
-            sedos_result_df.at[index, 'new'] = '0'
-    else: # if no numerical number at the end, no match
+            # Check if it starts with '0' (like _01, _02)
+            if number.startswith('0'):
+                sedos_result_df.at[index, 'new'] = '0'
+            # For other multi-digit numbers (like _11, _15)
+            else:
+                sedos_result_df.at[index, 'new'] = '1'
+    else:
+        # No number at the end
         sedos_result_df.at[index, 'new'] = '0'
         
         
@@ -182,8 +190,7 @@ sedos_result_df['parameter'].unique()
 # assign units to commodity
 # can create it from unit from 'Commodity_items' of VEDA input infrastructure (curently similar mapping is used)
 
-
-results_unit_path = "result_unit_mapping.xlsx"
+results_unit_path = "data_adapter_times/result_unit/result_unit_mapping.xlsx" 
 
 unit_mapping_commodity = pd.read_excel(results_unit_path, engine='openpyxl', sheet_name='SEDOS_commodity')
 
@@ -207,9 +214,6 @@ sedos_cost_unit_dict = {
     'costs_fixed': 'MEUR',
     'costs_variable': 'MEUR',
 }
-
-
-# In[112]:
 
 
 # SEDOS output parameters
@@ -260,8 +264,6 @@ sedos_result_df[sedos_result_df['unit_commodity']=='PJ']
 sedos_result_df[sedos_result_df['unit_cap']=='GW'] 
 
 
-
-
 # combine both into final 'unit' column 
 #sedos_result_df['unit'] = sedos_result_df['unit_commodity'].fillna(sedos_result_df['unit_cost']).fillna(sedos_result_df
 sedos_result_df['unit'] = np.where(sedos_result_df['unit_commodity'].notna(), sedos_result_df['unit_commodity'], 
@@ -269,31 +271,20 @@ sedos_result_df['unit'] = np.where(sedos_result_df['unit_commodity'].notna(), se
                                            sedos_result_df['unit_cap'])
                                   )
 
-
 # Finally, remove the temporary columns
 sedos_result_df = sedos_result_df.drop(columns=['unit_commodity', 'unit_cost', 'unit_cap'])
 print(sedos_result_df)
 
-
-
 sedos_result_df['parameter'].unique()
-
-
 # sector, catergory and specification columns
 # create those column by spliting the process name
-
-
 # value for sector, category and specification columns
 sedos_result_df['sector'] = sedos_result_df['process'].apply(lambda x: x.split('_')[0])
 sedos_result_df['category'] = sedos_result_df['process'].apply(lambda x: x.split('_')[1])
 sedos_result_df['specification'] = sedos_result_df['process'].apply(lambda x: x.split('_')[2])
 
-
 # drop commodity column, as values of commodity are in input and output groups columns
-
 sedos_result_df = sedos_result_df.drop(columns='commodity')
-
-
 
 unique_scenarios = sedos_result_df['scenario'].unique()
 
