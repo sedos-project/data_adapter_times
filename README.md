@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is designed to convert SEDOS data into TIMES format for further use in emissions and energy modeling. The workflow involves configuring settings, preparing input data, and generating output data by running a sequence of scripts. The output includes multiple Excel and pickle files that represent emissions factors and other relevant energy sector data in TIMES format.
+This project is designed to convert SEDOS data into TIMES format for further use in energy system model. The workflow involves configuring settings, preparing input data, and generating output data by running a sequence of scripts. The output includes multiple Excel and pickle files that represent emissions factors and other relevant energy sector data in TIMES format.
 
 ## Requirements
 
@@ -49,8 +49,8 @@ The data conversion process follows these steps:
 1. **Data Extraction**: Input SEDOS data from Modellstruktur.xlsx is read and validated
 2. **Data Transformation**: The process data is mapped according to configuration parameters such as Input, Output, Attribute etc in mapping_v4.xlsx
 3. **Data Enhancement**: Process data is retrieved from OEP (Open Energy Platform) and pasted to the appropriate process 
-4. **Emission Factor Calculation**: Emission factors are calculated and applied
-5. **Demand Calculation**: Demand factors are calculated and applied
+4. **Emission Factor Extraction**: Emission factors are extracted and applied accordingly
+5. **Demand Extraction**: Demand factors are extracted and applied
 6. **Output Generation**: Final data is exported in vt_DE_{sector} in both Excel (.xlsx) and pickle (.pkl) formats
 
 
