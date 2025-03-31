@@ -304,12 +304,24 @@ def update_commodity_list_units(excel_file_path, units_mapping):
                         ):
                             ctype_cell = row[ctype_col - 1]
                             ctype_cell.value = "HTHEAT"
+                        # commodity unit by commodity name in commodity list
+                        unit_cell = row[unit_col - 1]
+                        if "emi_" in commname:
+                            unit_cell.value = "Kt"
+                        if "pri_hydro_" in commname:
+                            unit_cell.value = "PJ"
+                           
                         if (
                             commname_cell.value.strip().lower()
                             == comm_name.strip().lower()
                         ):
                             unit_cell = row[unit_col - 1]
-                            unit_cell.value = field_unit
+                            if field_unit in "PJ/PJ":
+                                unit_cell.value = "PJ"
+                            elif field_name in "notFound":
+                                unit_cell.value = "PJ"
+                            else:
+                                unit_cell.value = field_unit
                             found = True
                             break  # Assuming CommName is unique
                 if not found:
@@ -353,7 +365,7 @@ def update_process_list_sheet(excel_file_path, units_mapping):
         return
 
     # Set Vintage column to 'NO' and populate PrimaryCG, Tact, and TCap
-    for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
+    for row in ws_process_list.iter_rows(min_row=header_row + 2, values_only=False):
         techname_cell = row[techname_col - 1]
         if techname_cell.value:
             process_name = techname_cell.value.strip()
@@ -361,12 +373,12 @@ def update_process_list_sheet(excel_file_path, units_mapping):
             # Define the substrings that should trigger "PJ"
             tcap_keywords = ["_source_", "_import_"]
 
-            if any(keyword in process_name for keyword in tcap_keywords):
+            if any(keyword in process_name for keyword in tcap_keywords) and "_hydro_" not in process_name:
                 row[tcap_col - 1].value = "PJ"
             elif "_storage_" in process_name:
                 row[tcap_col - 1].value = "GWh"
             else:
-                row[tcap_col - 1].value = ""
+                row[tcap_col - 1].value = "GW"
 
             # Set Vintage to 'NO'
             row[vintage_col - 1].value = "NO"
@@ -400,9 +412,10 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                             == f"conversion_factor_{primary_cg_temp}"
                         ):
                             if field["unit"]:
-                                row[tact_col - 1].value = field["unit"]
-                            else:
-                                row[tact_col - 1].value = "notFound"
+                                if field["unit"] in "PJ/PJ":
+                                    row[tact_col - 1].value = "PJ"
+                                else:
+                                    row[tact_col - 1].value = field["unit"]
             else:
                 if "_chp_" in process_name:
                     primary_cg = "NRGO"
@@ -411,13 +424,13 @@ def update_process_list_sheet(excel_file_path, units_mapping):
                 row[primary_cg_col - 1].value = primary_cg
 
                 # Set Tact to the unit from Commodity List
-                row[tact_col - 1].value = "notFound"
+                row[tact_col - 1].value = "PJ"
 
     # Additional check: Ensure that every cell in the Tact column has a value
     for row in ws_process_list.iter_rows(min_row=header_row + 1, values_only=False):
         tact_cell = row[tact_col - 1]
         if tact_cell.value is None or tact_cell.value == "":
-            tact_cell.value = "notFound"
+            tact_cell.value = "PJ"
 
     # Save the workbook
     wb.save(excel_file_path)
