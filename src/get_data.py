@@ -824,9 +824,12 @@ def data_mapping_internal(times_df, process_name, api_process_data):
     cap2act_value = 1  # Default to empty if no match is found
 
     if process_name.endswith("_1"):
+        if "methanol_biog_tra" in process_name: # check if the process is biomethanol production
+            cap2act_value = 1.5857
         # Check if 'cost_inv_p' exists in the API process data columns
-        if "cost_inv_p" in api_process_data.columns:
+        elif "cost_inv_p" in api_process_data.columns:
             cap2act_value = 31.536
+
     elif process_name.endswith("_0"):
         # Check if 'capacity_p_inst_0' exists in the API process data columns
         if "capacity_p_inst_0" in api_process_data.columns:
