@@ -9,7 +9,8 @@ import json
 input_folder_path = "data_adapter_times/results_vd" 
 output_folder_path = "data_adapter_times/results_csv"
 
-result_files = ['tokio_w_ghg-cap_2703.vd'] # list of result file names
+result_files = ["tokio_w_ghg-cap_2304.vd", "riga_w_gas-ghg-cap_2304.vd", "sina_w_min_h2_ghg-cap_2304.vd",
+                "sinb_w_min_wind_pv-elec_ghg-cap_2304.vd"] # list of result file names
 
 
 # Prepare .vd file into dataframe
@@ -65,8 +66,11 @@ cleaned_df = cleaned_df[~cleaned_df['Process'].str.contains('IMPDEMZ|IMPNRGZ|IMP
 
 # chnage scenario name
 scenario_name_dict = {
-    # 'riga_1511': 't_all_riga',
-    'tokio_w_ghg-cap_2703': 't_all_tokio'
+    "tokio_w_ghg-cap_2304": "t_all_tokio_v03",
+    'riga_w_gas-ghg-cap_2304': 't_all_riga_v02',
+    'sina_w_min_h2_ghg-cap_2304': 't_all_sina_v01',
+    'sinb_w_min_wind_pv-elec_ghg-cap_2304': 't_all_sinb_v01'
+
 }
 cleaned_df['Scenario'] = cleaned_df['Scenario'].map(scenario_name_dict)
 cleaned_df.head()
@@ -136,30 +140,52 @@ sedos_result_df.head()
 # 11, 12 instead denote different 1 "new" processes.
 
 for index, row in sedos_result_df.iterrows():
-    
-    # Extract the number at the end of the process
-    match = re.search(r'_(\d+)$', row['process'])
-    if match:
-        # Get the matched number
-        number = match.group(1)
-        
-        # Check if it's a single digit (like _0 or _1)
-        if len(number) == 1:
-            if number == '0':
-                sedos_result_df.at[index, 'new'] = '0'
+    # First, handle process names ending with _ag
+    if row['process'].endswith('_ag'):
+        # Look for the number before _ag
+        ag_match = re.search(r'_(\d+)_ag$', row['process'])
+        if ag_match:
+            number = ag_match.group(1)
+            # Use the same logic as before
+            if len(number) == 1:
+                if number == '0':
+                    sedos_result_df.at[index, 'new'] = '0'
+                else:
+                    sedos_result_df.at[index, 'new'] = '1'
             else:
-                sedos_result_df.at[index, 'new'] = '1'
-        # Check if it's a multi-digit number
+                # For multi-digit numbers
+                if number.startswith('0'):
+                    sedos_result_df.at[index, 'new'] = '0'
+                else:
+                    sedos_result_df.at[index, 'new'] = '1'
         else:
-            # Check if it starts with '0' (like _01, _02)
-            if number.startswith('0'):
-                sedos_result_df.at[index, 'new'] = '0'
-            # For other multi-digit numbers (like _11, _15)
-            else:
-                sedos_result_df.at[index, 'new'] = '1'
+            # No number before _ag
+            sedos_result_df.at[index, 'new'] = '0'
+    
+    # Then handle the original case for process names ending with a number
     else:
-        # No number at the end
-        sedos_result_df.at[index, 'new'] = '0'
+        match = re.search(r'_(\d+)$', row['process'])
+        if match:
+            # Get the matched number
+            number = match.group(1)
+            
+            # Check if it's a single digit (like _0 or _1)
+            if len(number) == 1:
+                if number == '0':
+                    sedos_result_df.at[index, 'new'] = '0'
+                else:
+                    sedos_result_df.at[index, 'new'] = '1'
+            # Check if it's a multi-digit number
+            else:
+                # Check if it starts with '0' (like _01, _02)
+                if number.startswith('0'):
+                    sedos_result_df.at[index, 'new'] = '0'
+                # For other multi-digit numbers (like _11, _15)
+                else:
+                    sedos_result_df.at[index, 'new'] = '1'
+        else:
+            # No number at the end
+            sedos_result_df.at[index, 'new'] = '0'
         
         
     # value for input_groups and output_groups based on parameter VAR_Fin and VAR_FOut
